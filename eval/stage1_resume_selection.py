@@ -77,5 +77,5 @@ if __name__ == "__main__":
     cli.add_argument("--seed", type=int, default=45613)
     cli.add_argument("--envs", type=int, default=16)
     cli.add_argument("--max-steps", type=int, default=400)
-    cli.add_argument("--device", choices=("cpu", "ppu"), default="ppu")
+    cli.add_argument("--device", choices=("cpu", "ppu", "cuda"), default="ppu")
     main(cli.parse_args())

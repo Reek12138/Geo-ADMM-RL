@@ -4,7 +4,7 @@
 
 [![Native BlueSky 0.05s](https://img.shields.io/badge/BlueSky_0.05s_Arrival-98.61%25_(355%2F360)-10b981)](#原生-bluesky-005s-六场景正式留出测试)
 [![Exp 1 Figure 4](https://img.shields.io/badge/Exp_1_Figure_4-750%2F750_(100%25%2C_0_Col)-38bdf8)](#exp-1-figure-4-主基准对比官方闭合)
-[![Tests](https://img.shields.io/badge/Regression_Tests-74%2F74_Passed-6366f1)](#快速开始)
+[![Tests](https://img.shields.io/badge/Regression_Tests-80%2F80_Passed-6366f1)](#快速开始)
 [![BlueSky Accelerator](https://img.shields.io/badge/Simulator-bluesky--for--rl_(Plan_A_%2F_B)-f59e0b)](https://github.com/Reek12138/bluesky-for-rl)
 
 > **AI Agents / 复现指南**：如果你是 AI Agent 或需要一步步复现本仓库的推理评测、训练流程与论文 Exp 1–6 实验矩阵，请直接阅读 [**`AGENTS.md`**](AGENTS.md)。
@@ -240,10 +240,10 @@ git clone -b plan-a-batched-cpu https://github.com/Reek12138/bluesky-for-rl.git 
 git clone -b plan-b-pytorch-gpu https://github.com/Reek12138/bluesky-for-rl.git third_party/bluesky-plan-b
 ```
 
-### 2. 运行回归测试（74/74）
+### 2. 运行回归测试（80/80）
 
 ```bash
-PYTHONPATH=third_party/bluesky-plan-b:. python -B -m pytest -q -p no:cacheprovider
+PYTHONPATH=third_party/bluesky-plan-b:. python -B -m pytest tests -q -p no:cacheprovider
 ```
 
 ### 3. 运行原生 `0.05s` 配对推理评测

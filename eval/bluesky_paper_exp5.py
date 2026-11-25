@@ -50,5 +50,5 @@ if __name__ == "__main__":
     for name in ("acceptance", "checkpoint", "output"):
         cli.add_argument(f"--{name}", type=Path, required=True)
     cli.add_argument("--navdata", type=Path)
-    cli.add_argument("--device", choices=("cpu", "ppu"), default="ppu")
+    cli.add_argument("--device", choices=("cpu", "ppu", "cuda"), default="ppu")
     run(cli.parse_args())

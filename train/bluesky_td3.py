@@ -18,6 +18,7 @@ from envs.bluesky_graph import (
 )
 from envs.bluesky_safety import lookahead_risk, protected_command
 from envs.bluesky_traffic import FAMILIES, MIXTURE_NAMES
+from eval.admm_gap_mpc import plan_gap_maneuver
 from train.td3 import (
     REPLAY_EVENTS, CollisionHorizon, CrossingExploration, DeviceReplay, MultiStepReturns, Rollout, TD3, encode_executed_action,
     load_teacher_data, mirror_replay_batch,
@@ -283,6 +284,10 @@ def _run(args, device, learner, environment, monitor=None, resume=None):
                         actor_events.add_(torch.nn.functional.one_hot(actor_sample.events,
                                                                       num_classes=len(REPLAY_EVENTS)).sum(dim=0))
 
+    period = getattr(args, "admm_communication_period", None)
+    gap_policy = getattr(args, "admm_gap_policy", "hold")
+    interval = max(1, int(round(period / args.control_dt))) if period is not None else 1
+
     for decision in range(start_decision + 1, args.decisions + 1):
         chunks = zip(*(tensor.split(args.inference_batch) for tensor in graph), strict=True)
         if exploration is None:
@@ -296,8 +301,15 @@ def _run(args, device, learner, environment, monitor=None, resume=None):
         physical = environment.physical
         executed = action[..., 4:]
         feasible = torch.zeros_like(graph[-1])
-        if args.admm_k:
+        scheduled = bool(args.admm_k) and ((decision - 1) % interval == 0)
+        if scheduled:
             executed, feasible = project(action, physical, graph[2], graph[3], consensus)
+        elif args.admm_k and gap_policy == "hold":
+            executed = torch.zeros_like(executed)
+        elif args.admm_k and gap_policy == "mpc":
+            margin = getattr(args, "batched_layer_margin", 0.0) or 6.0
+            executed, _, planned = plan_gap_maneuver(physical, graph[3], executed, margin=margin)
+            feasible = graph[3] & (planned == 0).unsqueeze(-1)
         if unprotected is not None:
             executed = torch.where(unprotected[:, None, None], action[..., 4:], executed)
             feasible = feasible & ~unprotected.unsqueeze(-1)
@@ -505,6 +517,12 @@ def train(args, *, monitor=None):
     if not isfinite(args.coordination_weight) or args.coordination_weight < 0 or (
             args.coordination_weight and (args.admm_k < 1 or args.dense_extra_rounds < 0)):
         raise ValueError("Coordination training needs a finite nonnegative weight and ADMM projection")
+    period = getattr(args, "admm_communication_period", None)
+    if period is not None:
+        if not isfinite(period) or period < args.control_dt or abs(period / args.control_dt - round(period / args.control_dt)) > 1e-6:
+            raise ValueError("ADMM communication period must be a positive multiple of control_dt")
+        if not args.admm_k:
+            raise ValueError("ADMM communication period requires ADMM projection")
     if not 0 <= args.unprotected_rollout_fraction <= 1:
         raise ValueError("Unprotected rollout fraction must be between zero and one")
     if args.unprotected_rollout_fraction and (not args.admm_k or not args.executed_action_critic):
@@ -535,9 +553,11 @@ def train(args, *, monitor=None):
     args.output.mkdir(parents=True, exist_ok=False)
     if args.device == "ppu" and importlib.util.find_spec("torch_ppu") is not None:
         __import__("torch_ppu")
-    device = torch.device("cuda:0" if args.device == "ppu" else "cpu")
-    if device.type == "cuda" and (torch.cuda.device_count() != 1 or "PPU" not in torch.cuda.get_device_name(0)):
+    device = torch.device("cuda:0" if args.device in ("ppu", "cuda") else "cpu")
+    if args.device == "ppu" and (torch.cuda.device_count() != 1 or "PPU" not in torch.cuda.get_device_name(0)):
         raise RuntimeError("Train on exactly one PPU")
+    if args.device == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError("CUDA requested but no GPU is available")
     torch.set_num_threads(1)
     path = args.resume or args.initialize
     source = torch.load(path, map_location=device, weights_only=True) if path else None
@@ -589,7 +609,8 @@ def train(args, *, monitor=None):
                   expected_mode_risk_loss=args.expected_mode_risk, collision_critic_target=args.collision_critic_target,
                   return_steps=args.return_window if args.multi_step_return else 1,
                   coordination_weight=args.coordination_weight,
-                  coordination_rounds=(args.admm_k, args.dense_extra_rounds))
+                  coordination_rounds=(args.admm_k, args.dense_extra_rounds),
+                  coordination_margin=getattr(args, "batched_layer_margin", 0.0))
     learner.actor.observation_profile = profile
     if learner.anchor is not None:
         learner.anchor.equivariant_actor = bool(anchor.get("equivariant_actor", False))
@@ -643,7 +664,7 @@ def train(args, *, monitor=None):
 def build_parser():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--plan", choices=("a", "b", "native"), required=True)
-    parser.add_argument("--device", choices=("cpu", "ppu"), default="ppu")
+    parser.add_argument("--device", choices=("cpu", "ppu", "cuda"), default="ppu")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--initialize", type=Path)
     parser.add_argument("--initialize-critic", action="store_true",
@@ -699,6 +720,9 @@ def build_parser():
     parser.add_argument("--width", type=int, default=256)
     parser.add_argument("--admm-k", type=int, default=0)
     parser.add_argument("--admm-fallback", type=int, default=0)
+    parser.add_argument("--admm-communication-period", type=float, default=None,
+                        help="Run ADMM only on periodic ticks while applying the gap policy on intermediate ticks")
+    parser.add_argument("--admm-gap-policy", choices=("hold", "mpc"), default="hold")
     parser.add_argument("--component-projection", action="store_true")
     parser.add_argument("--vertical-heading", action="store_true")
     parser.add_argument("--directional-heading", action="store_true")

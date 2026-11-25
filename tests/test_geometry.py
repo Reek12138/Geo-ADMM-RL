@@ -1382,3 +1382,154 @@ def test_expected_mode_risk_matches_fixed_modes_and_scores_an_unselected_climb()
     assert risk[0, 2] == 0 and route_gradient[0, 2].count_nonzero() == 0
 
 
+def test_delayed_consensus_transmits_once_per_edge_per_tick_without_amplifying_delivery():
+    reference = torch.tensor([[2.0, 4.0]])
+    edge = torch.tensor([[[False, True], [False, False]]])
+    active = torch.tensor([[True, True]])
+    live = torch.tensor([True])
+
+    def project(proposal, _responsibility, _lower, _upper):
+        return torch.zeros_like(proposal)
+
+    for colored in (False, True):
+        exchange = DelayedPairExchange(0.0, 70111, 1, "cpu", delay=2)
+        for tick in range(4):
+            exchange.begin_step(tick, active, live)
+            layer = exchange.layer(("primary", "speed"))
+            action, dual, residual = _consensus_updates(
+                reference, 0.0, 10.0, edge, project, iterations=5, rho=0.5, mobility=None,
+                warm_dual=None, exchange=layer, colored_updates=colored,
+            )
+            assert torch.isfinite(action).all() and torch.isfinite(dual).all() and torch.isfinite(residual).all()
+        report, = exchange.report()
+        # Exactly one packet attempt per active edge per tick (4 ticks -> 4 attempts, not 4*5 or 4*5*2).
+        assert report["attempted_pair_exchanges"] == 4
+        assert report["delivered_pair_exchanges"] == 2
+        assert report["in_flight_pair_exchanges"] == 2
+        assert report["used_delayed_pair_states"] == 2
+        # Local dual was updated on the final tick rather than staying stuck at zero.
+        assert dual[edge].abs().max() > 0
+
+
+def test_altitude_admm_with_vertical_inertia_detects_reversing_overshoot():
+    position = torch.tensor([[[0.0, 0.0, 100.0], [500.0, 0.0, 0.0]]], dtype=torch.float64)
+    velocity = torch.tensor([[[10.0, 0.0], [-10.0, 0.0]]], dtype=torch.float64)
+    proposal = torch.zeros((1, 2), dtype=torch.float64, requires_grad=True)
+    active = torch.ones((1, 2), dtype=torch.bool)
+    bounds = dict(minimum_altitude=0.0, maximum_altitude=304.8, horizontal_radius=5000.0, iterations=0)
+    # Without vertical inertia, 100 m initial gap >= 91.44 m looks feasible at K=0.
+    no_inertia = altitude_admm(position, velocity, proposal, active, **bounds)
+    assert no_inertia.feasible.item()
+    # With upper aircraft descending at -7.62 m/s, 19.05 m braking overshoot breaches 91.44 m.
+    descending = torch.tensor([[-7.62, 0.0]], dtype=torch.float64)
+    with_inertia = altitude_admm(position, velocity, proposal, active, vertical_speed=descending, **bounds)
+    assert not with_inertia.feasible.item()
+    # K=2 gradients through inertia-aware altitude_admm remain finite.
+    solved = altitude_admm(position, velocity, proposal, active, vertical_speed=descending,
+                           minimum_altitude=0.0, maximum_altitude=304.8, horizontal_radius=5000.0, iterations=2)
+    solved.offset.square().sum().backward()
+    assert torch.isfinite(proposal.grad).all()
+
+
+def test_protected_command_marks_discrete_layer_search_resolutions_feasible():
+    # Two aircraft colliding on the same altitude where speed-only fails and ADMM K=0 leaves conflict unresolved,
+    # while batched_layer_search resolves it cleanly via vertical layer separation.
+    position = torch.tensor([[[-6000.0, 0.0, 182.88], [6000.0, 0.0, 182.88]]])
+    direction = torch.tensor([[[1.0, 0.0], [-1.0, 0.0]]])
+    speed = torch.full((1, 2), 180.0)
+    state = PhysicalState(position, direction, speed, torch.zeros_like(speed), speed, speed, position[..., 2])
+    active = torch.ones((1, 2), dtype=torch.bool)
+    adjacency = ~torch.eye(2, dtype=torch.bool).unsqueeze(0)
+    actions = torch.zeros((1, 2, 7))
+    _, admm_only_feasible = protected_command(actions, state.tensors(), adjacency, active, None, 0, 0)
+    assert not admm_only_feasible.any()
+    controls, resolved_feasible = protected_command(
+        actions, state.tensors(), adjacency, active, None, 0, 0,
+        batched_layer_search=True, batched_layer_margin=6.0, early_layer_search=True, exact_layer_forecast=True,
+    )
+    assert resolved_feasible.all()
+    assert (controls[0, 0, 1] - controls[0, 1, 1]).abs() >= 0.99
+
+
+def test_coordination_loss_trains_equivariant_admm_heads_without_nans_on_clear_worlds():
+    # World 0 has a live conflict; World 1 is completely separated (minimum_clearance == +inf).
+    position = torch.tensor([
+        [[-6000.0, 0.0, 30.0], [6000.0, 2200.0, 30.0], [0.0, -3500.0, 80.0]],
+        [[-40000.0, 0.0, 0.0], [40000.0, 40000.0, 300.0], [0.0, -40000.0, 180.0]],
+    ])
+    direction = torch.tensor([[[1.0, 0.0], [-1.0, 0.0], [0.0, 1.0]]] * 2)
+    speed = torch.full((2, 3), 180.0)
+    active = torch.ones((2, 3), dtype=torch.bool)
+    adjacency = torch.stack((~torch.eye(3, dtype=torch.bool), torch.zeros(3, 3, dtype=torch.bool)))
+    graph = torch.randn((2, 3, 24)), torch.randn((2, 3, 3, 18)), adjacency, active
+    physical = PhysicalState(position, direction, speed, torch.zeros_like(speed), speed, speed, position[..., 2])
+    actor = Actor(width=16, equivariant_actor=True)
+    policy = actor(*graph, deterministic=True, detach_coordination=True)
+    loss = coordination_loss(
+        encode_action(policy)[..., 4:], physical.tensors(), adjacency, active,
+        policy.consensus_inputs, 2, 2, vertical_margin=6.0,
+    )
+    assert torch.isfinite(loss)
+    loss.backward()
+    for head in (actor.consensus, actor.altitude_consensus, actor.willingness):
+        assert all(p.grad is not None and torch.isfinite(p.grad).all() for p in head.parameters())
+    assert any(p.grad.abs().max() > 0 for head in (actor.consensus, actor.altitude_consensus, actor.willingness)
+               for p in head.parameters())
+    assert all(p.grad is None for head in (actor.router, actor.speed, actor.altitude, actor.heading, actor.encoder)
+               for p in head.parameters())
+
+
+def test_decentralized_gap_mpc_breaks_symmetry_preserves_yaw_and_checks_inertia():
+    # (1) Symmetric equal-altitude head-on conflict separates cleanly without communication.
+    position = torch.tensor([[[-6000.0, 0.0, 180.0], [6000.0, 0.0, 180.0]]])
+    direction = torch.tensor([[[1.0, 0.0], [-1.0, 0.0]]])
+    speed = torch.full((1, 2), 180.0)
+    active = torch.ones((1, 2), dtype=torch.bool)
+    proposal = torch.zeros((1, 2, 3))
+    state = (position, direction, speed, torch.zeros_like(speed), speed, speed, position[..., 2])
+    commands, hold_contacts, planned_contacts = plan_gap_maneuver(state, active, proposal)
+    assert hold_contacts.item() == 1 and planned_contacts.item() == 0
+    assert commands[0, 0, 1] > 0 and commands[0, 1, 1] < 0
+
+    # (2) Changing aircraft 1's private proposal never changes aircraft 0's chosen command (true decentralization).
+    alt_proposal = proposal.clone()
+    alt_proposal[0, 1] = torch.tensor([-0.9, 0.0, 0.8])
+    alt_commands, _, _ = plan_gap_maneuver(state, active, alt_proposal)
+    torch.testing.assert_close(commands[0, 0], alt_commands[0, 0], rtol=0.0, atol=0.0)
+
+    # (3) Conflict-free off-route aircraft keeps safe pure heading-recovery proposal instead of holding.
+    clear_pos = torch.tensor([[[-40000.0, 0.0, 180.0], [40000.0, 40000.0, 180.0]]])
+    yaw_proposal = torch.tensor([[[0.0, 0.0, -0.8], [0.0, 0.0, 0.0]]])
+    clear_state = (clear_pos, *state[1:])
+    yaw_cmd, hold_c, plan_c = plan_gap_maneuver(clear_state, active, yaw_proposal)
+    assert hold_c.item() == plan_c.item() == 0
+    torch.testing.assert_close(yaw_cmd[0, 0], yaw_proposal[0, 0])
+
+    # (4) Accelerated vertical inertia contact is detected even when linear forecast would miss it.
+    trap_pos = torch.tensor([[[0.0, 0.0, 103.8628], [1000.0, 0.0, 201.0156]]])
+    trap_vs = torch.tensor([[0.0, -7.62]])
+    trap_sel = torch.tensor([[30.435, 185.341]])
+    trap_state = (trap_pos, direction, speed, trap_vs, speed, speed, trap_sel)
+    _, trap_hold, _ = plan_gap_maneuver(trap_state, active, proposal)
+    assert trap_hold.item() == 1
+
+
+def test_exp6_one_step_config_verification_tolerates_legacy_configs(tmp_path):
+    from eval.bluesky_paper_exp6 import _verify_one_step_control
+
+    base_cfg = {"plan": "b", "return_window": 24, "multi_step_return": True, "output": "a", "decisions": 2200,
+                "target_episodes": 0, "target_updates": 20000}
+    new_cfg = {**base_cfg, "multi_step_return": False, "output": "b", "decisions": 1523, "target_updates": 0,
+               "admm_communication_period": None, "admm_gap_policy": "hold"}
+    p_ckpt, o_ckpt = tmp_path / "primary.pt", tmp_path / "one_step.pt"
+    torch.save({"updates": 15000, "decisions": 1523, "training_plan": "b", "tag": "p"}, p_ckpt)
+    torch.save({"updates": 15000, "decisions": 1523, "training_plan": "b", "tag": "o"}, o_ckpt)
+    c_cfg, s_cfg = tmp_path / "control.json", tmp_path / "one.json"
+    c_cfg.write_text(json.dumps(base_cfg))
+    s_cfg.write_text(json.dumps(new_cfg))
+    args = SimpleNamespace(checkpoint=p_ckpt, one_step_checkpoint=o_ckpt, control_config=c_cfg, one_step_config=s_cfg)
+    verified = _verify_one_step_control(args)
+    assert verified["updates"] == 15000 and verified["decisions"] == 1523
+
+
+

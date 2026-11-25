@@ -458,7 +458,7 @@ class TD3:
                  safe_navigation_weight=0.0, teacher_data=(), teacher_weight=0.0, rollout_router_temperature=1.0,
                  collision_critic_weight=0.0, collision_critic_warmup=600, expected_mode_risk_loss=False,
                  collision_critic_target="td", return_steps=1, coordination_weight=0.0, coordination_rounds=(2, 0),
-                 anchor_categories=(), equivariant_actor=False):
+                 coordination_margin=0.0, anchor_categories=(), equivariant_actor=False):
         self.actor = Actor(width=width, equivariant_actor=equivariant_actor).to(device)
         if actor_state is not None:
             self.actor.load_state_dict(actor_state)
@@ -501,6 +501,7 @@ class TD3:
         self.rollout_router_temperature = rollout_router_temperature
         self.coordination_weight = coordination_weight
         self.coordination_rounds = coordination_rounds
+        self.coordination_margin = coordination_margin
         self.last_coordination_loss = None
         self.teacher_rng = torch.Generator(device=device).manual_seed(torch.initial_seed()) if teacher_data else None
         if anchor_state is not None and anchor_weight:
@@ -627,7 +628,7 @@ class TD3:
                 if self.coordination_weight:
                     tuning = policy.consensus_inputs
                     geometry = coordination_loss(action[..., 4:], batch.physical, batch.graph[2], active, tuning,
-                                                 *self.coordination_rounds)
+                                                 *self.coordination_rounds, vertical_margin=self.coordination_margin)
                     self.last_coordination_loss = geometry.detach()
                     actor_loss = actor_loss + self.coordination_weight * geometry
                 if self.teacher_data:

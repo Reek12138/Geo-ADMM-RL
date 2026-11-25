@@ -445,7 +445,7 @@ if __name__ == "__main__":
     parser.add_argument("--coordination-weight", type=float, default=0.0)
     parser.add_argument("--topology-replay", action="store_true")
     parser.add_argument("--expected-mode-risk", action="store_true")
-    parser.add_argument("--device", choices=("cpu", "ppu"), default="ppu")
+    parser.add_argument("--device", choices=("cpu", "ppu", "cuda"), default="ppu")
     options = parser.parse_args()
     if options.every_episodes is None:
         options.every_episodes = 200 if options.short_refine else 500

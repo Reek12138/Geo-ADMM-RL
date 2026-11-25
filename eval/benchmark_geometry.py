@@ -99,7 +99,7 @@ def benchmark(device, batch, repeat, seed):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--device", choices=("cpu", "ppu"), default="cpu")
+    parser.add_argument("--device", choices=("cpu", "ppu", "cuda"), default="cpu")
     parser.add_argument("--batch", type=int, default=1)
     parser.add_argument("--repeat", type=int, default=20)
     parser.add_argument("--seed", type=int, default=3401)
@@ -114,7 +114,9 @@ def main():
             raise RuntimeError("The benchmark needs exactly one allocated accelerator")
         if "PPU" not in torch.cuda.get_device_name(0).upper():
             raise RuntimeError("The selected accelerator is not a PPU")
-    device = torch.device("cuda:0" if args.device == "ppu" else "cpu")
+    elif args.device == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError("CUDA requested but no GPU is available")
+    device = torch.device("cuda:0" if args.device in ("ppu", "cuda") else "cpu")
     metrics = benchmark(device, args.batch, args.repeat, args.seed)
     rendered = json.dumps(metrics, indent=2) + "\n"
     if args.output:

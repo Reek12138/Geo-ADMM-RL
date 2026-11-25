@@ -303,7 +303,7 @@ def compare(args):
         raise ValueError("Baseline ablation requires paired projection and ablation")
     if args.device == "ppu" and importlib.util.find_spec("torch_ppu") is not None:
         __import__("torch_ppu")
-    device = torch.device("cuda:0" if args.device == "ppu" else "cpu")
+    device = torch.device("cuda:0" if args.device in ("ppu", "cuda") else "cpu")
     torch.set_num_threads(1)
     args.output.mkdir(parents=True)
     policies = {"baseline": args.baseline, **{f"candidate_{i}": path for i, path in enumerate(args.candidates, 1)}}
@@ -390,7 +390,7 @@ def build_parser():
     parser.add_argument("--seeds", type=int, default=5)
     parser.add_argument("--parallel-pairs", type=int, default=1,
                         help="Overlap this many independent native policy evaluations on one device")
-    parser.add_argument("--device", choices=("cpu", "ppu"), default="ppu")
+    parser.add_argument("--device", choices=("cpu", "ppu", "cuda"), default="ppu")
     parser.add_argument("--admm-k", type=int, default=2)
     parser.add_argument("--admm-fallback", type=int, default=0)
     parser.add_argument("--cold-start-admm", action="store_true",

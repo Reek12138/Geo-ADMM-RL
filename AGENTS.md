@@ -72,21 +72,15 @@ Because both branches expose top-level package `bluesky`, set `PYTHONPATH` stric
   ```bash
   export PYTHONPATH="third_party/bluesky-plan-a:."
   ```
-- **Plan B GPU/PPU training (`--plan b`) and full 74-test pytest run**:
+- **Plan B GPU/PPU training (`--plan b`) and full 80-test pytest run**:
   ```bash
   export PYTHONPATH="third_party/bluesky-plan-b:."
   ```
 
-### Hardware Device Note (`--device ppu` vs. NVIDIA CUDA vs. CPU)
+### Hardware Device Note (`--device cpu | ppu | cuda`)
 
-- Scripts expose `--device cpu|ppu`, where `ppu` maps to `torch.device("cuda:0")`.
-- Because the published benchmarks were strictly audited on a single **PPU-ZW810E**, five entrypoints explicitly guard `if "PPU" not in torch.cuda.get_device_name(0)`:
-  - `train/bluesky_td3.py:539`
-  - `train/behavior_clone.py:153`
-  - `eval/run_bluesky.py:20`
-  - `eval/benchmark_geometry.py:115`
-  - `eval/verify_plan_b_ppu.py:14`
-- **If you are running on an NVIDIA CUDA GPU** (e.g. A100/H100/H800/RTX): either run evaluation on `--device cpu`, or relax that `"PPU"` substring check locally on your branch (note that `eval/bluesky_pair.py` does **not** enforce the `"PPU"` name check and works directly with `--device ppu` on `cuda:0`).
+- All training and evaluation entrypoints accept `--device cpu`, `--device ppu`, or `--device cuda`.
+- `--device ppu` enforces the strict single **PPU-ZW810E** allocation guard used for the published benchmarks; `--device cuda` runs directly on any NVIDIA CUDA GPU (`cuda:0`) without the PPU device-name check.
 
 ### Navigation Cache Deduplication Tip
 
@@ -96,13 +90,13 @@ BlueSky generates a ~15.73 MiB navdata cache per fresh working directory. Reuse 
 
 ## 3. Fast Verification Gate (Run Before & After Any Code Edit)
 
-### 3.1 Full Unit & Regression Suite (74 Tests)
+### 3.1 Full Unit & Regression Suite (80 Tests)
 
 ```bash
-PYTHONPATH=third_party/bluesky-plan-b:. python -B -m pytest -q -p no:cacheprovider
+PYTHONPATH=third_party/bluesky-plan-b:. python -B -m pytest tests -q -p no:cacheprovider
 ```
 
-Expected: `74 passed` (if `bluesky.rl_gpu` is absent from `PYTHONPATH`, `73 passed, 1 skipped` for the Plan B timed-departure test).
+Expected: `80 passed` (always pass `tests` explicitly so pytest does not collect duplicate `third_party/` BlueSky test suites; if `bluesky.rl_gpu` is absent from `PYTHONPATH`, `79 passed, 1 skipped`).
 
 ### 3.2 Geometry Kernel Micro-Benchmark
 
@@ -253,8 +247,8 @@ PYTHONPATH=third_party/bluesky-plan-b:. python -B -m train.bluesky_td3 \
   --initialize-critic \
   --equivariant-actor \
   --family full_mixture \
-  --timed-departures --correlated-yaw \
-  --envs 512 --aircraft 12 \
+  --timed-departures --physics64 \
+  --envs 512 --aircraft 20 \
   --sim-dt 0.25 --control-dt 6.0 --max-steps 400 \
   --performance-calibration configs/b737_legacy_cruise.json \
   --detection-km 35 \
@@ -265,12 +259,17 @@ PYTHONPATH=third_party/bluesky-plan-b:. python -B -m train.bluesky_td3 \
   --joint-layer-search --joint-layer-reserve 10.0 \
   --projected-target-action --projected-actor-ste \
   --executed-action-critic --mirror-replay \
-  --stratified-replay --terminal-replay --topology-replay \
-  --return-window 24 --multi-step-return \
-  --batch 128 --updates 4 --replay 32768 \
+  --stratified-replay --return-window 24 --multi-step-return \
+  --crossing-exploration-steps 8 \
+  --shaped-reward --lookahead-weight 0.7 --raw-risk-weight 0.75 \
+  --navigation-weight 1.5 --projection-weight 0.12 \
+  --coordination-weight 0.15 \
+  --batch 64 --inference-batch 256 --updates 10 --replay 8192 \
   --learning-rate 1.2e-4 --cosine-updates 20000 \
   --target-updates 20000 --checkpoint-every 5000
 ```
+
+*(Set `--coordination-weight 0.0` to reproduce the historical frozen-warmstart `98.61%` checkpoint; keep `--coordination-weight 0.15` and optionally add `--admm-communication-period 12 --admm-gap-policy mpc --selected-altitude-observation --cross-track-observation` for joint ADMM warm-start + decentralized MPC co-training.)*
 
 **Checkpoint Selection Protocol (Critical)**:
 - Evaluate every `5,000` updates (`5k`, `10k`, `15k`, `20k`) on **both** native `0.05s` development panels (`61231–61235` and `75121–75125`) with `12 s MPC` AND run the 4-case native Critic Q ranking audit (`eval.bluesky_team_preference_audit`).

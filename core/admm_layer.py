@@ -47,6 +47,20 @@ def _consensus_updates(reference, lower, upper, edge, project, iterations, rho, 
     weight = 1 + penalty.sum(dim=-1) + penalty.sum(dim=-2)
     action = reference
     residual = torch.zeros_like(reference[..., 0])
+    if delayed is not None:
+        # Inter-tick latency precludes receiving a response within the same tick.
+        # Compute one local update against the latest matured state and send once per edge.
+        if iterations + extra_rounds > 0:
+            weighted = penalty.unsqueeze(-1) * (consensus - dual)
+            action = ((reference + weighted[..., 0].sum(dim=-1) + weighted[..., 1].sum(dim=-2)) / weight).clamp(lower, upper)
+            shared = _pair_columns(action)
+            proposed = project((shared + dual).clamp(pair_lo, pair_hi), responsibility, pair_lo, pair_hi)
+            next_dual = dual + torch.where(edge.unsqueeze(-1), shared - proposed, 0.0)
+            exchange.send(edge, proposed, next_dual)
+            difference = torch.where(edge.unsqueeze(-1), shared - consensus, 0.0)
+            residual = difference.abs().amax(dim=(-3, -2, -1))
+            dual = next_dual
+        return action, dual, residual
     groups = (None,)
     if colored_updates:
         adjacent = edge | edge.transpose(-1, -2)
@@ -71,9 +85,6 @@ def _consensus_updates(reference, lower, upper, edge, project, iterations, rho, 
             action = update if selected is None else torch.where(selected, update, action)
             shared = _pair_columns(action)
             proposed = project((shared + dual).clamp(pair_lo, pair_hi), responsibility, pair_lo, pair_hi)
-            if delayed is not None:
-                exchange.send(requested, proposed, dual + shared - proposed)
-                continue
             if exchange is None and group is None:
                 delivered = requested
                 consensus = proposed
@@ -157,18 +168,18 @@ class AltitudePlan:
 def altitude_admm(position, horizontal_velocity, proposal, active, *, minimum_altitude, maximum_altitude,
                   horizon=120.0, horizontal_radius=5000.0, vertical_radius=91.44, max_offset=91.44,
                   climb_time=15.0, iterations=5, rho=8.0, mobility=None, warm_dual=None, margin=3.0,
-                  colored_ties=False, extra_rounds=0, exchange=None, colored_updates=False):
+                  colored_ties=False, extra_rounds=0, exchange=None, colored_updates=False,
+                  vertical_speed=None, acceleration=1.524):
     """Resolve residual horizontal interactions using bounded piecewise-affine climbs.
 
-    The climb starts immediately and reaches its commanded offset at climb_time.
+    The climb starts immediately (or after arresting opposing vertical inertia when
+    vertical_speed is provided) and reaches its commanded offset after climb_time.
     Every horizontal overlap is considered, including traffic in target layers.
     """
     relative = position.unsqueeze(-2) - position.unsqueeze(-3)
     delta_velocity = horizontal_velocity.unsqueeze(-2) - horizontal_velocity.unsqueeze(-3)
     lo, hi, horizontal_hit = _ball_interval(relative[..., :2], delta_velocity, horizontal_radius, horizon)
     edge = _pairs(active) & horizontal_hit
-    ramp_lo = (lo / climb_time).clamp(0, 1)
-    ramp_hi = (hi / climb_time).clamp(0, 1)
     gap = relative[..., 2]
     extra_nodes = torch.zeros_like(active)
     if extra_rounds:
@@ -190,17 +201,41 @@ def altitude_admm(position, horizontal_velocity, proposal, active, *, minimum_al
     lower = (minimum_altitude - position[..., 2]).clamp_min(-max_offset)
     upper = (maximum_altitude - position[..., 2]).clamp_max(max_offset)
 
-    def offsets(consensus):
-        difference = consensus[..., 0] - consensus[..., 1]
-        return gap + difference * ramp_lo, gap + difference * ramp_hi
+    def _inertia_profile(direction):
+        vs_i = vertical_speed.to(dtype=position.dtype).unsqueeze(-1)
+        vs_j = vertical_speed.to(dtype=position.dtype).unsqueeze(-2)
+        oppose_i = (-direction * vs_i).clamp_min(0.0)
+        oppose_j = (direction * vs_j).clamp_min(0.0)
+        brake_i = oppose_i / acceleration
+        brake_j = oppose_j / acceleration
+        sample_times = torch.stack((lo, hi, brake_i.clamp(lo, hi), brake_j.clamp(lo, hi)), dim=0)
+        tb_i = torch.minimum(sample_times, brake_i.unsqueeze(0))
+        tb_j = torch.minimum(sample_times, brake_j.unsqueeze(0))
+        loss_i = oppose_i.unsqueeze(0) * tb_i - 0.5 * acceleration * tb_i.square()
+        loss_j = oppose_j.unsqueeze(0) * tb_j - 0.5 * acceleration * tb_j.square()
+        ri = ((sample_times - brake_i.unsqueeze(0)).clamp_min(0.0) / climb_time).clamp(0.0, 1.0)
+        rj = ((sample_times - brake_j.unsqueeze(0)).clamp_min(0.0) / climb_time).clamp(0.0, 1.0)
+        return ri, rj, loss_i + loss_j
+
+    if vertical_speed is None:
+        ramp_lo = (lo / climb_time).clamp(0, 1)
+        ramp_hi = (hi / climb_time).clamp(0, 1)
+        times_i = torch.stack((ramp_lo, ramp_hi), dim=0)
+        times_j = times_i
+        inertia_loss = torch.zeros_like(times_i)
+    else:
+        times_i, times_j, inertia_loss = _inertia_profile(ordering)
+
+    def signed_gaps(consensus, direction=ordering, ri=times_i, rj=times_j, loss=inertia_loss):
+        raw = gap.unsqueeze(0) + consensus[..., 0].unsqueeze(0) * ri - consensus[..., 1].unsqueeze(0) * rj
+        return raw * direction.unsqueeze(0) - loss
 
     def project(consensus, responsibility, lower, upper):
-        early, late = offsets(consensus)
-        early, late = early * ordering, late * ordering
-        worst = torch.minimum(early, late)
-        ramp = torch.where(early <= late, ramp_lo, ramp_hi)
-        derivative = ordering * ramp
-        gradient = torch.stack((derivative, -derivative), dim=-1)
+        gaps = signed_gaps(consensus)
+        worst, index = gaps.min(dim=0)
+        ri = times_i.gather(0, index.unsqueeze(0)).squeeze(0)
+        rj = times_j.gather(0, index.unsqueeze(0)).squeeze(0)
+        gradient = torch.stack((ordering * ri, -ordering * rj), dim=-1)
         step_direction = responsibility * gradient
         scale = (gradient * step_direction).sum(dim=-1).clamp_min(1e-9)
         shortfall = torch.where(edge, (vertical_radius + margin - worst).clamp_min(0), 0.0)
@@ -210,8 +245,14 @@ def altitude_admm(position, horizontal_velocity, proposal, active, *, minimum_al
         proposal, lower, upper, edge, project, iterations, rho, mobility, warm_dual, extra_rounds, extra_nodes,
         exchange=exchange, colored_updates=colored_updates,
     )
-    early, late = offsets(_pair_columns(altitude))
-    separation = torch.where(early * late <= 0, 0.0, torch.minimum(early.abs(), late.abs()))
+    pair_altitude = _pair_columns(altitude)
+    pos_sep = signed_gaps(pair_altitude).amin(dim=0).clamp_min(0.0)
+    if vertical_speed is None:
+        neg_sep = signed_gaps(pair_altitude, -ordering, times_i, times_j, inertia_loss).amin(dim=0).clamp_min(0.0)
+    else:
+        opp_ri, opp_rj, opp_loss = _inertia_profile(-ordering)
+        neg_sep = signed_gaps(pair_altitude, -ordering, opp_ri, opp_rj, opp_loss).amin(dim=0).clamp_min(0.0)
+    separation = torch.maximum(pos_sep, neg_sep)
     clearance_margin = (separation - vertical_radius).masked_fill(~edge, float("inf"))
     minimum = clearance_margin.amin(dim=(-1, -2))
     violations = clearance_margin < -1e-5

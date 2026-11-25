@@ -155,7 +155,7 @@ def build_scale_parser():
     parser.add_argument("--seeds", type=int, default=5)
     parser.add_argument("--max-steps", type=int, default=400)
     parser.add_argument("--parallel-pairs", type=int, default=1)
-    parser.add_argument("--device", choices=("cpu", "ppu"), default="ppu")
+    parser.add_argument("--device", choices=("cpu", "ppu", "cuda"), default="ppu")
     parser.add_argument("--ablation", action="store_true")
     parser.add_argument("--mpc-gap", action="store_true")
     parser.add_argument("--navdata", type=Path)

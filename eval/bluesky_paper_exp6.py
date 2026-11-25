@@ -22,6 +22,8 @@ def _verify_one_step_control(args):
     for config in (full, ablated):
         config.setdefault("initialize_critic", False)
         config.setdefault("freeze_actor_encoder", False)
+        config.setdefault("admm_communication_period", None)
+        config.setdefault("admm_gap_policy", "hold")
     if (full["return_window"] != 24 or ablated["return_window"] != 24
             or not full["multi_step_return"] or ablated["multi_step_return"]):
         raise ValueError("Only critic return length should change, with both arms retaining 24-decision replay maturity")
@@ -89,14 +91,14 @@ def _native_panel(args, folder, *, drop_edges=False):
 def run(args):
     digest = paper_checkpoint_digest(args.acceptance, args.checkpoint)
     one_step = _verify_one_step_control(args)
-    args.output.mkdir(parents=True)
+    args.output.mkdir(parents=True, exist_ok=True)
     projected_and_raw = _native_panel(args, args.output / "projection")
     no_potential_edges = _native_panel(args, args.output / "existing-edges-only", drop_edges=True)
     kss = args.output / "kss-substitution"
     figure4(argparse.Namespace(
         acceptance=args.acceptance, checkpoint=args.checkpoint, manifests=args.manifests, history=args.history,
         sarl_checkout=args.sarl_checkout, navdata=args.navdata, output=kss, geo_kss_ablation=True,
-        device="cuda:0" if args.device == "ppu" else "cpu",
+        device="cuda:0" if args.device in ("ppu", "cuda") else "cpu",
     ))
     summary = kss / "summary.json"
     result = dict(
@@ -111,7 +113,7 @@ if __name__ == "__main__":
     cli = argparse.ArgumentParser(description=__doc__)
     for name in ("acceptance", "checkpoint", "manifests", "history", "sarl-checkout", "navdata", "output"):
         cli.add_argument(f"--{name}", type=Path, required=True)
-    cli.add_argument("--device", choices=("cpu", "ppu"), default="ppu")
+    cli.add_argument("--device", choices=("cpu", "ppu", "cuda"), default="ppu")
     for name in ("one-step-checkpoint", "control-config", "one-step-config"):
         cli.add_argument(f"--{name}", type=Path)
     options = cli.parse_args()

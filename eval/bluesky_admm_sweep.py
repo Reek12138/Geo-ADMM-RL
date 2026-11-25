@@ -157,7 +157,7 @@ def build_sweep_parser():
     parser.add_argument("--aircraft", type=int, default=12)
     parser.add_argument("--max-steps", type=int, default=400)
     parser.add_argument("--parallel-pairs", type=int, default=1)
-    parser.add_argument("--device", choices=("cpu", "ppu"), default="ppu")
+    parser.add_argument("--device", choices=("cpu", "ppu", "cuda"), default="ppu")
     parser.add_argument("--navdata", type=Path)
     parser.add_argument("--early-layer-search", action="store_true")
     parser.add_argument("--exact-layer-forecast", action="store_true")

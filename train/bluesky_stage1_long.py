@@ -192,5 +192,5 @@ if __name__ == "__main__":
     parser.add_argument("--anchor-families", choices=MIXTURE_NAMES, nargs="+", default=[])
     parser.add_argument("--crossing-exploration-steps", type=int, default=1)
     parser.add_argument("--feedback-audit", type=Path)
-    parser.add_argument("--device", choices=("cpu", "ppu"), default="ppu")
+    parser.add_argument("--device", choices=("cpu", "ppu", "cuda"), default="ppu")
     run(parser.parse_args())

@@ -152,6 +152,8 @@ def train(args):
     device = torch.device("cpu" if args.device == "cpu" else "cuda:0")
     if args.device == "ppu" and (torch.cuda.device_count() != 1 or "PPU" not in torch.cuda.get_device_name(0)):
         raise RuntimeError("Run PPU training within a single PPU allocation")
+    if args.device == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError("CUDA requested but no GPU is available")
     torch.set_num_threads(1)
     torch.manual_seed(args.seed)
     args.output.mkdir(parents=True, exist_ok=False)
@@ -213,7 +215,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--device", choices=("cpu", "ppu"), default="cpu")
+    parser.add_argument("--device", choices=("cpu", "ppu", "cuda"), default="cpu")
     parser.add_argument("--epochs", type=int, default=12)
     parser.add_argument("--batch", type=int, default=32)
     parser.add_argument("--width", type=int, default=256)

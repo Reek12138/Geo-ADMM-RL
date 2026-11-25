@@ -107,7 +107,7 @@ def _protect_heading(state, planned_speed, heading, active, *, altitude_command=
 
 def _admm_plans(action, state, ground_delta, adjacency, active, consensus, iterations, extra_rounds,
                 *, independent_tiers=False, exchange=None, colored_updates=False, observe_residuals=None,
-                channel="primary"):
+                channel="primary", vertical_margin=0.0):
     speed = state.ground_speed
     initial_speed = speed + ground_delta * action[..., 0]
     remaining_altitude = (state.selected_altitude - state.position[..., 2]).clamp(-LAYER, LAYER)
@@ -129,6 +129,7 @@ def _admm_plans(action, state, ground_delta, adjacency, active, consensus, itera
                            active, minimum_altitude=0.0, maximum_altitude=304.8, horizon=SCALE.horizon,
                            horizontal_radius=SCALE.horizontal_radius, iterations=iterations,
                            warm_dual=altitude_dual, rho=altitude_rho, mobility=mobility, colored_ties=True,
+                           margin=max(3.0, float(vertical_margin)), vertical_speed=state.vertical_speed,
                            extra_rounds=extra_rounds, exchange=altitude_exchange, colored_updates=colored_updates)
     if observe_residuals is not None:
         observe_residuals(first.primal_residual, second.primal_residual)
@@ -136,10 +137,12 @@ def _admm_plans(action, state, ground_delta, adjacency, active, consensus, itera
 
 
 def _project_components(action, state, ground_delta, adjacency, members, active, consensus, iterations, extra_rounds,
-                        *, exchange=None, colored_updates=False, observe_residuals=None, channel="primary"):
+                        *, exchange=None, colored_updates=False, observe_residuals=None, channel="primary",
+                        vertical_margin=0.0):
     first, second, initial_altitude, remaining_altitude = _admm_plans(
         action, state, ground_delta, adjacency, active, consensus, iterations, extra_rounds, exchange=exchange,
         colored_updates=colored_updates, observe_residuals=observe_residuals, channel=channel,
+        vertical_margin=vertical_margin,
     )
     changes_altitude = active & (initial_altitude.abs() > 1.0)
     first_issues = first.conflicts.any(dim=-1) | changes_altitude
@@ -160,14 +163,17 @@ def _project_components(action, state, ground_delta, adjacency, members, active,
     return projected, use_speed
 
 
-def coordination_loss(action, physical, adjacency, active, consensus, iterations, extra_rounds):
+def coordination_loss(action, physical, adjacency, active, consensus, iterations, extra_rounds, *, vertical_margin=0.0):
     """Train the continuous warm start against the same constraints as the rollout projector."""
     state = PhysicalState(*physical)
     ground_delta = CAS_DELTA * (state.tas / state.cas.clamp_min(1)).clamp(0.8, 2.0)
     first, second, _, _ = _admm_plans(action.detach(), state, ground_delta, adjacency, active, consensus,
-                                      iterations, extra_rounds, independent_tiers=True)
-    speed_gap = (-first.minimum_clearance).clamp_min(0.0) / SCALE.horizontal_radius
-    layer_gap = (-second.minimum_clearance).clamp_min(0.0) / LAYER
+                                      iterations, extra_rounds, independent_tiers=True,
+                                      vertical_margin=vertical_margin)
+    speed_shortfall = torch.where(torch.isfinite(first.minimum_clearance), (-first.minimum_clearance).clamp_min(0.0), 0.0)
+    layer_shortfall = torch.where(torch.isfinite(second.minimum_clearance), (-second.minimum_clearance).clamp_min(0.0), 0.0)
+    speed_gap = speed_shortfall / SCALE.horizontal_radius
+    layer_gap = layer_shortfall / LAYER
     speed_residual = first.primal_residual / CAS_DELTA
     layer_residual = second.primal_residual / LAYER
     return (speed_gap.square() + layer_gap.square() + 0.1 * (speed_residual.square() + layer_residual.square())).mean()
@@ -192,11 +198,12 @@ def protected_command(action, state, adjacency, active, consensus, iterations, f
         members = labels.unsqueeze(-1) == labels.unsqueeze(-2)
     proposed, feasible = _project_components(action, state, ground_delta, adjacency, members, active, consensus,
                                              iterations, extra_rounds, exchange=exchange, colored_updates=colored_updates,
-                                             observe_residuals=observe_residuals)
+                                             observe_residuals=observe_residuals, vertical_margin=batched_layer_margin)
     if fallback:
         fixed, verified = _project_components(action, state, ground_delta, adjacency, members, active, None, fallback, 0,
                                               exchange=exchange, colored_updates=colored_updates,
-                                              observe_residuals=observe_residuals, channel="fallback")
+                                              observe_residuals=observe_residuals, channel="fallback",
+                                              vertical_margin=batched_layer_margin)
         proposed = torch.where((verified & ~feasible).unsqueeze(-1), fixed, proposed)
         feasible = feasible | verified
     proposed = proposed.clamp(-1, 1)
@@ -208,11 +215,13 @@ def protected_command(action, state, adjacency, active, consensus, iterations, f
         heading = _protect_heading(state, speed, proposed[..., 2], active, altitude_command=altitude_command)
     controls = torch.stack((proposed[..., 0], proposed[..., 1], heading), dim=-1)
     if batched_layer_search:
-        controls = _discrete_layer_search(state, controls, active, feasible, margin=batched_layer_margin,
-                                          accelerated=accelerated_layer_forecast,
-                                          early=early_layer_search, exact=exact_layer_forecast,
-                                          preserve_imminent=preserve_imminent_clearance, joint=joint_layer_search,
-                                          joint_reserve=joint_layer_reserve)
+        controls, layer_feasible = _discrete_layer_search(
+            state, controls, active, feasible, members=members, margin=batched_layer_margin,
+            accelerated=accelerated_layer_forecast, early=early_layer_search, exact=exact_layer_forecast,
+            preserve_imminent=preserve_imminent_clearance, joint=joint_layer_search,
+            joint_reserve=joint_layer_reserve,
+        )
+        feasible = feasible | layer_feasible
     return controls.masked_fill(~active.unsqueeze(-1), 0.0), feasible
 
 
@@ -270,8 +279,8 @@ def _joint_clearance_reserve(clearance, overlaps, entry, choice, reserve):
     return ~overlaps[..., None, None] | (clearance >= minimum[..., None, None])
 
 
-def _discrete_layer_search(state, controls, active, feasible, *, margin=0.0, accelerated=False, preserve_imminent=False,
-                           early=False, exact=False, joint=False, joint_reserve=0.0):
+def _discrete_layer_search(state, controls, active, feasible, *, members=None, margin=0.0, accelerated=False,
+                           preserve_imminent=False, early=False, exact=False, joint=False, joint_reserve=0.0):
     if not isfinite(joint_reserve) or joint_reserve < 0 or (joint_reserve and not joint):
         raise ValueError("The reserve must be nonnegative and requires three-aircraft search")
     forecast = _forecast_command(state, controls, dense=False)
@@ -318,8 +327,15 @@ def _discrete_layer_search(state, controls, active, feasible, *, margin=0.0, acc
             reserved = preserve if reserved is None else reserved & preserve
         choice = improve_three_aircraft_choices(compatible, choice, connected_components(overlaps),
                                                preferred=preferred, preserve=reserved)
+    batch, aircraft, _, options, _ = compatible.shape
+    other = choice[:, None, :, None, None].expand(batch, aircraft, aircraft, options, 1)
+    own = choice[:, :, None, None].expand(batch, aircraft, aircraft, 1)
+    chosen_compatible = compatible.gather(-1, other).squeeze(-1).gather(-1, own).squeeze(-1)
+    layer_issues = (~chosen_compatible).any(dim=-1)
+    scope = active.unsqueeze(-2) if members is None else members
+    layer_feasible = active & ~(scope & layer_issues.unsqueeze(-2)).any(dim=-1)
     altitude = candidates.gather(-1, choice.unsqueeze(-1)).squeeze(-1)
-    return torch.stack((controls[..., 0], altitude, controls[..., 2]), dim=-1)
+    return torch.stack((controls[..., 0], altitude, controls[..., 2]), dim=-1), layer_feasible
 
 
 def _margin_bands(distance, gap):
