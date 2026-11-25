@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# External BlueSky checkouts (clone Reek12138/bluesky-for-rl here)
+third_party/
+
+# Model checkpoints, datasets, caches & runtime outputs
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.safetensors
+*.npy
+*.npz
+*.parquet
+*.h5
+*.tar.gz
+*.zip
+outputs/
+runs/
+cache/
+tmp/
+logs/
+*.log
+
+# OS & editor files
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo

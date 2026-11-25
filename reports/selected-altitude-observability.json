@@ -1,0 +1,334 @@
+{
+  "crossing4-67229-batched": {
+    "aircraft_decisions": 1614,
+    "pending_altitude": 55,
+    "pending_altitude_with_neighbor": 24,
+    "risk_change_over_point_one": 39,
+    "max_risk_change": 0.8605594635009766,
+    "examples": [
+      {
+        "decision": 65,
+        "slot": 0,
+        "has_graph_neighbor": true,
+        "true_risk": 0.094055,
+        "same_observation_other_target": 0.443224,
+        "altitude_target_delta_m": 0.0,
+        "current_vertical_rate_mps": 0.0
+      },
+      {
+        "decision": 65,
+        "slot": 4,
+        "has_graph_neighbor": true,
+        "true_risk": 0.161177,
+        "same_observation_other_target": 0.457808,
+        "altitude_target_delta_m": 63.8556,
+        "current_vertical_rate_mps": 7.62
+      },
+      {
+        "decision": 66,
+        "slot": 4,
+        "has_graph_neighbor": true,
+        "true_risk": 0.172048,
+        "same_observation_other_target": 0.390265,
+        "altitude_target_delta_m": 18.1356,
+        "current_vertical_rate_mps": 7.62
+      },
+      {
+        "decision": 68,
+        "slot": 11,
+        "has_graph_neighbor": false,
+        "true_risk": 0.143573,
+        "same_observation_other_target": 0.447194,
+        "altitude_target_delta_m": -63.8556,
+        "current_vertical_rate_mps": -7.62
+      },
+      {
+        "decision": 69,
+        "slot": 11,
+        "has_graph_neighbor": false,
+        "true_risk": 0.144227,
+        "same_observation_other_target": 0.368675,
+        "altitude_target_delta_m": -18.1356,
+        "current_vertical_rate_mps": -7.62
+      },
+      {
+        "decision": 70,
+        "slot": 2,
+        "has_graph_neighbor": true,
+        "true_risk": 0.537923,
+        "same_observation_other_target": 0.950273,
+        "altitude_target_delta_m": 0.0,
+        "current_vertical_rate_mps": 0.0
+      },
+      {
+        "decision": 70,
+        "slot": 4,
+        "has_graph_neighbor": true,
+        "true_risk": 0.31887,
+        "same_observation_other_target": 0.082892,
+        "altitude_target_delta_m": 0.0,
+        "current_vertical_rate_mps": 0.0
+      },
+      {
+        "decision": 70,
+        "slot": 5,
+        "has_graph_neighbor": true,
+        "true_risk": 0.539709,
+        "same_observation_other_target": 0.949286,
+        "altitude_target_delta_m": 63.8528,
+        "current_vertical_rate_mps": 7.62
+      }
+    ],
+    "source_sha256": "eba177822832c571d4ca934dca98c2edce2202e01548a7c402abd2fe365ec615",
+    "default_graph_identical": true
+  },
+  "crossing6-67231-batched": {
+    "aircraft_decisions": 1817,
+    "pending_altitude": 40,
+    "pending_altitude_with_neighbor": 24,
+    "risk_change_over_point_one": 19,
+    "max_risk_change": 0.6793476343154907,
+    "examples": [
+      {
+        "decision": 57,
+        "slot": 2,
+        "has_graph_neighbor": false,
+        "true_risk": 0.135673,
+        "same_observation_other_target": 0.422586,
+        "altitude_target_delta_m": 63.8556,
+        "current_vertical_rate_mps": 7.62
+      },
+      {
+        "decision": 57,
+        "slot": 3,
+        "has_graph_neighbor": false,
+        "true_risk": 0.135673,
+        "same_observation_other_target": 0.422586,
+        "altitude_target_delta_m": 0.0,
+        "current_vertical_rate_mps": 0.0
+      },
+      {
+        "decision": 58,
+        "slot": 2,
+        "has_graph_neighbor": false,
+        "true_risk": 0.112695,
+        "same_observation_other_target": 0.364105,
+        "altitude_target_delta_m": 20.762,
+        "current_vertical_rate_mps": 7.62
+      },
+      {
+        "decision": 58,
+        "slot": 3,
+        "has_graph_neighbor": false,
+        "true_risk": 0.112695,
+        "same_observation_other_target": 0.364105,
+        "altitude_target_delta_m": 0.0,
+        "current_vertical_rate_mps": 0.0
+      },
+      {
+        "decision": 73,
+        "slot": 5,
+        "has_graph_neighbor": true,
+        "true_risk": 0.250255,
+        "same_observation_other_target": 0.565368,
+        "altitude_target_delta_m": 0.0,
+        "current_vertical_rate_mps": 0.0
+      },
+      {
+        "decision": 73,
+        "slot": 9,
+        "has_graph_neighbor": true,
+        "true_risk": 0.102956,
+        "same_observation_other_target": 0.430008,
+        "altitude_target_delta_m": -63.8556,
+        "current_vertical_rate_mps": -7.62
+      },
+      {
+        "decision": 74,
+        "slot": 5,
+        "has_graph_neighbor": true,
+        "true_risk": 0.255603,
+        "same_observation_other_target": 0.464748,
+        "altitude_target_delta_m": 0.0,
+        "current_vertical_rate_mps": 0.0
+      },
+      {
+        "decision": 74,
+        "slot": 9,
+        "has_graph_neighbor": true,
+        "true_risk": 0.103127,
+        "same_observation_other_target": 0.324286,
+        "altitude_target_delta_m": -18.1356,
+        "current_vertical_rate_mps": -7.62
+      }
+    ],
+    "source_sha256": "fe2fd4d1ce9c33293597fb97655fa5246c1c6ba1046d2589517e532918aab459",
+    "default_graph_identical": true
+  },
+  "yaw_minus15-72461-batched": {
+    "aircraft_decisions": 2082,
+    "pending_altitude": 28,
+    "pending_altitude_with_neighbor": 12,
+    "risk_change_over_point_one": 15,
+    "max_risk_change": 0.30046242475509644,
+    "examples": [
+      {
+        "decision": 63,
+        "slot": 0,
+        "has_graph_neighbor": true,
+        "true_risk": 0.128103,
+        "same_observation_other_target": 0.398997,
+        "altitude_target_delta_m": 0.0,
+        "current_vertical_rate_mps": 0.0
+      },
+      {
+        "decision": 63,
+        "slot": 1,
+        "has_graph_neighbor": false,
+        "true_risk": 0.128097,
+        "same_observation_other_target": 0.398991,
+        "altitude_target_delta_m": -63.8556,
+        "current_vertical_rate_mps": -7.62
+      },
+      {
+        "decision": 64,
+        "slot": 0,
+        "has_graph_neighbor": true,
+        "true_risk": 0.133562,
+        "same_observation_other_target": 0.355188,
+        "altitude_target_delta_m": 0.0,
+        "current_vertical_rate_mps": 0.0
+      },
+      {
+        "decision": 64,
+        "slot": 1,
+        "has_graph_neighbor": false,
+        "true_risk": 0.133557,
+        "same_observation_other_target": 0.355183,
+        "altitude_target_delta_m": -18.1356,
+        "current_vertical_rate_mps": -7.62
+      },
+      {
+        "decision": 69,
+        "slot": 2,
+        "has_graph_neighbor": true,
+        "true_risk": 0.158035,
+        "same_observation_other_target": 0.458498,
+        "altitude_target_delta_m": 0.0,
+        "current_vertical_rate_mps": 0.0
+      },
+      {
+        "decision": 69,
+        "slot": 5,
+        "has_graph_neighbor": true,
+        "true_risk": 0.320542,
+        "same_observation_other_target": 0.033056,
+        "altitude_target_delta_m": 0.0,
+        "current_vertical_rate_mps": 0.0
+      },
+      {
+        "decision": 70,
+        "slot": 2,
+        "has_graph_neighbor": true,
+        "true_risk": 0.183934,
+        "same_observation_other_target": 0.408365,
+        "altitude_target_delta_m": 0.0,
+        "current_vertical_rate_mps": 0.0
+      },
+      {
+        "decision": 70,
+        "slot": 6,
+        "has_graph_neighbor": true,
+        "true_risk": 0.14507,
+        "same_observation_other_target": 0.369501,
+        "altitude_target_delta_m": -18.1356,
+        "current_vertical_rate_mps": -7.62
+      }
+    ],
+    "source_sha256": "6b29ff23db0c3e9985a8fd1fe899be04687a9c81ac43e2200d893144588d9eb2",
+    "default_graph_identical": true
+  },
+  "yaw_plus15-72461-batched": {
+    "aircraft_decisions": 2259,
+    "pending_altitude": 41,
+    "pending_altitude_with_neighbor": 27,
+    "risk_change_over_point_one": 34,
+    "max_risk_change": 0.6771280765533447,
+    "examples": [
+      {
+        "decision": 58,
+        "slot": 4,
+        "has_graph_neighbor": true,
+        "true_risk": 0.124397,
+        "same_observation_other_target": 0.387466,
+        "altitude_target_delta_m": 0.0,
+        "current_vertical_rate_mps": 0.0
+      },
+      {
+        "decision": 58,
+        "slot": 9,
+        "has_graph_neighbor": true,
+        "true_risk": 0.124397,
+        "same_observation_other_target": 0.387466,
+        "altitude_target_delta_m": 63.8556,
+        "current_vertical_rate_mps": 7.62
+      },
+      {
+        "decision": 59,
+        "slot": 4,
+        "has_graph_neighbor": true,
+        "true_risk": 0.105392,
+        "same_observation_other_target": 0.353396,
+        "altitude_target_delta_m": 0.0,
+        "current_vertical_rate_mps": 0.0
+      },
+      {
+        "decision": 59,
+        "slot": 9,
+        "has_graph_neighbor": true,
+        "true_risk": 0.105392,
+        "same_observation_other_target": 0.353396,
+        "altitude_target_delta_m": 21.1578,
+        "current_vertical_rate_mps": 7.62
+      },
+      {
+        "decision": 64,
+        "slot": 1,
+        "has_graph_neighbor": false,
+        "true_risk": 0.000562,
+        "same_observation_other_target": 0.410531,
+        "altitude_target_delta_m": -25.3058,
+        "current_vertical_rate_mps": -7.62
+      },
+      {
+        "decision": 66,
+        "slot": 3,
+        "has_graph_neighbor": true,
+        "true_risk": 0.129158,
+        "same_observation_other_target": 0.349951,
+        "altitude_target_delta_m": 63.8556,
+        "current_vertical_rate_mps": 7.62
+      },
+      {
+        "decision": 69,
+        "slot": 0,
+        "has_graph_neighbor": true,
+        "true_risk": 0.130374,
+        "same_observation_other_target": 0.422288,
+        "altitude_target_delta_m": 0.0,
+        "current_vertical_rate_mps": 0.0
+      },
+      {
+        "decision": 69,
+        "slot": 2,
+        "has_graph_neighbor": true,
+        "true_risk": 0.176762,
+        "same_observation_other_target": 0.468108,
+        "altitude_target_delta_m": 0.0,
+        "current_vertical_rate_mps": 0.0
+      }
+    ],
+    "source_sha256": "4ef3e9659d4466afa70343947253fcd8271c59f97b7c86a2bee96b4a94fec296",
+    "default_graph_identical": true
+  }
+}

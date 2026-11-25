@@ -1,0 +1,29 @@
+{
+  "root": "/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3",
+  "verified": 1001,
+  "merged": 997,
+  "approximate_released_allocated_bytes": 16449191936,
+  "groups": {
+    "bce8155f2322e48357563409d92b0c110a23807f4abe0e99a29ac5cdb32cc7f7": {
+      "canonical": "/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/independent-native-layer-fallback.G1bs3q/crossing6/layer-fallback/worker-02/cache/navdata.p",
+      "size": 16493932,
+      "copies": 644
+    },
+    "94b75d10abb377f81199efeeb67a63314daa93ee72da0ac708b2f5dc3b20dd0f": {
+      "canonical": "/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/frame-audit-smoke.56b1ck/cache/navdata.p",
+      "size": 16493932,
+      "copies": 87
+    },
+    "c04c21c36a955d167ba9c2c8ea8f633eed17991b2fb023c1d518580b0b7c285f": {
+      "canonical": "/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/frame-audited-holdout.moQMNS/run/yaw_plus15-baseline/worker-02/cache/navdata.p",
+      "size": 16493937,
+      "copies": 180
+    },
+    "b06e7659997e7cbcf252dd61c30fe110dd65b8b6b53aea0cbb6d7c36e4ded829": {
+      "canonical": "/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/holdout.1pMj3p/run/yaw_plus15-baseline/worker-02/cache/navdata.p",
+      "size": 16493937,
+      "copies": 90
+    }
+  },
+  "errors": []
+}

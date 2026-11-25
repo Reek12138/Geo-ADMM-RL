@@ -1,0 +1,1666 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>从零读懂 Geo-ADMM-RL · 空管多机防撞强化学习技术报告</title>
+<style>
+  :root {
+    --bg: #070d1a;
+    --bg-soft: #0d1629;
+    --panel: #111d36;
+    --panel-hover: #172748;
+    --border: #233860;
+    --border-bright: #3b82f6;
+    --text: #e6eefb;
+    --muted: #93a7c8;
+    --cyan: #38bdf8;
+    --emerald: #34d399;
+    --amber: #fbbf24;
+    --rose: #fb7185;
+    --violet: #a78bfa;
+    --blue: #60a5fa;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", Roboto, sans-serif;
+    background: radial-gradient(circle at 12% 0%, #132345 0%, var(--bg) 52%);
+    color: var(--text);
+    line-height: 1.72;
+  }
+  /* Top Sticky Nav */
+  .topnav {
+    position: sticky; top: 0; z-index: 100;
+    backdrop-filter: blur(12px);
+    background: rgba(7, 13, 26, 0.85);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 20px;
+  }
+  .topnav-inner {
+    max-width: 1180px; margin: 0 auto;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  }
+  .brand { font-weight: 800; font-size: 15px; color: var(--cyan); letter-spacing: .03em; display: flex; align-items: center; gap: 8px; }
+  .brand-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--emerald); box-shadow: 0 0 10px var(--emerald); }
+  .nav-links { display: flex; gap: 14px; flex-wrap: wrap; }
+  .nav-links a {
+    color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 500;
+    padding: 4px 8px; border-radius: 6px; transition: all .15s;
+  }
+  .nav-links a:hover { color: var(--text); background: rgba(56,189,248,.12); }
+
+  .container { max-width: 1180px; margin: 0 auto; padding: 32px 24px 90px; }
+
+  /* Hero */
+  .hero {
+    border: 1px solid var(--border);
+    background: linear-gradient(135deg, rgba(17,29,54,.96), rgba(9,16,32,.9));
+    border-radius: 22px;
+    padding: 36px 40px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: "";
+    position: absolute; right: -80px; top: -80px;
+    width: 320px; height: 320px; border-radius: 50%;
+    border: 1px dashed rgba(56,189,248,.22);
+    box-shadow: 0 0 0 50px rgba(56,189,248,.025), 0 0 0 105px rgba(56,189,248,.012);
+    pointer-events: none;
+  }
+  .pill-tag {
+    display: inline-block; font-size: 12px; font-weight: 600;
+    padding: 4px 12px; border-radius: 999px;
+    background: rgba(56,189,248,.14); color: var(--cyan);
+    border: 1px solid rgba(56,189,248,.35); margin-bottom: 14px;
+  }
+  .hero h1 { margin: 0 0 12px; font-size: 32px; line-height: 1.25; }
+  .hero p { margin: 0; color: var(--muted); max-width: 820px; font-size: 15.5px; }
+  .kpi-row {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px; margin-top: 26px;
+  }
+  .kpi {
+    background: rgba(7, 13, 26, .65);
+    border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px;
+  }
+  .kpi .k-label { font-size: 12px; color: var(--muted); }
+  .kpi .k-val { font-size: 25px; font-weight: 800; margin: 4px 0 2px; }
+  .kpi .k-sub { font-size: 12px; color: var(--muted); }
+
+  /* Sections */
+  section { margin-top: 48px; scroll-margin-top: 72px; }
+  .sec-head { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+  .sec-num {
+    width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, rgba(56,189,248,.22), rgba(167,139,250,.22));
+    border: 1px solid rgba(56,189,248,.4); color: var(--cyan);
+    font-weight: 800; font-size: 15px;
+  }
+  .sec-head h2 { margin: 0; font-size: 23px; }
+  .sec-lead { color: var(--muted); margin: -6px 0 20px; font-size: 15px; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 22px 24px;
+  }
+  .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+
+  .callout {
+    background: linear-gradient(90deg, rgba(56,189,248,.10), rgba(17,29,54,.6));
+    border-left: 4px solid var(--cyan);
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin: 16px 0;
+    font-size: 14.5px;
+  }
+  .callout.amber {
+    background: linear-gradient(90deg, rgba(251,191,36,.10), rgba(17,29,54,.6));
+    border-left-color: var(--amber);
+  }
+  .callout.emerald {
+    background: linear-gradient(90deg, rgba(52,211,153,.10), rgba(17,29,54,.6));
+    border-left-color: var(--emerald);
+  }
+  .callout.rose {
+    background: linear-gradient(90deg, rgba(251,113,133,.10), rgba(17,29,54,.6));
+    border-left-color: var(--rose);
+  }
+
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 12.8px;
+    background: rgba(56,189,248,.12);
+    color: #bae6fd;
+    padding: 2px 6px;
+    border-radius: 5px;
+  }
+
+  .c-cyan { color: var(--cyan); }
+  .c-emerald { color: var(--emerald); }
+  .c-amber { color: var(--amber); }
+  .c-rose { color: var(--rose); }
+  .c-violet { color: var(--violet); }
+
+  /* Interactive SVG Architecture */
+  .arch-wrap {
+    background: #091122;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px;
+    overflow-x: auto;
+  }
+  svg.arch-svg { width: 100%; min-width: 860px; height: auto; display: block; }
+  .svg-node { cursor: pointer; transition: filter .2s, transform .2s; }
+  .svg-node:hover rect { stroke: #38bdf8; stroke-width: 2.2; filter: drop-shadow(0 0 8px rgba(56,189,248,.45)); }
+  .svg-node.active rect { stroke: #34d399; stroke-width: 2.6; filter: drop-shadow(0 0 12px rgba(52,211,153,.55)); }
+  .arch-inspector {
+    margin-top: 16px;
+    background: var(--panel-hover);
+    border: 1px solid rgba(52,211,153,.45);
+    border-radius: 14px;
+    padding: 18px 22px;
+  }
+  .arch-inspector h3 { margin: 0 0 8px; font-size: 17px; color: var(--emerald); }
+  .tensor-badge {
+    display: inline-block; font-family: ui-monospace, monospace; font-size: 12px;
+    background: rgba(167,139,250,.18); color: #ddd6fe; border: 1px solid rgba(167,139,250,.4);
+    padding: 2px 8px; border-radius: 6px; margin-bottom: 10px;
+  }
+
+  /* Interactive Simulation Lab */
+  .sim-tabs { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .btn {
+    padding: 8px 14px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--panel); color: var(--text); cursor: pointer;
+    font-size: 13px; font-weight: 600; transition: all .15s;
+  }
+  .btn:hover { border-color: var(--cyan); background: var(--panel-hover); }
+  .btn.active { background: rgba(56,189,248,.18); border-color: var(--cyan); color: var(--cyan); }
+  .btn.primary { background: rgba(52,211,153,.18); border-color: var(--emerald); color: var(--emerald); }
+  .btn.warn { background: rgba(251,191,36,.15); border-color: var(--amber); color: var(--amber); }
+
+  .sim-stage {
+    background: #081020;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px;
+  }
+  .sim-canvases {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+  }
+  @media (max-width: 820px) { .sim-canvases { grid-template-columns: 1fr; } }
+  .pane {
+    background: #060c18;
+    border: 1px solid #1e3154;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .pane-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 14px; background: rgba(17,29,54,.85);
+    border-bottom: 1px solid #1e3154; font-size: 13.5px; font-weight: 700;
+  }
+  .pane canvas { width: 100%; height: 390px; display: block; cursor: grab; touch-action: none; }
+  .pane canvas:active { cursor: grabbing; }
+  .pane-foot {
+    display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+    padding: 9px 14px; background: rgba(10,18,34,.9);
+    border-top: 1px solid #1e3154; font-size: 12.5px; color: var(--muted);
+  }
+  .sim-controls {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border);
+  }
+  .sim-controls input[type="range"] { flex: 1; min-width: 180px; accent-color: var(--cyan); }
+  .sim-story {
+    margin-top: 12px; padding: 12px 16px; border-radius: 10px;
+    background: rgba(17,29,54,.75); border: 1px solid var(--border);
+    font-size: 13.5px; color: var(--text);
+  }
+
+  /* Tables & Bars */
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; padding: 11px 13px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); background: rgba(7,13,26,.55); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  .bar-row { margin-bottom: 14px; }
+  .bar-top { display: flex; justify-content: space-between; font-size: 13.5px; margin-bottom: 5px; }
+  .bar-bg { height: 11px; background: #070d1a; border-radius: 999px; overflow: hidden; border: 1px solid #1d2f52; }
+  .bar-fill { height: 100%; border-radius: 999px; }
+
+  /* Step Cards */
+  .step-list { display: grid; gap: 14px; }
+  .step-item {
+    display: grid; grid-template-columns: 44px 1fr; gap: 14px; align-items: start;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px;
+  }
+  .step-icon {
+    width: 44px; height: 44px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 16px;
+    background: rgba(56,189,248,.14); color: var(--cyan); border: 1px solid rgba(56,189,248,.35);
+  }
+  .step-item h4 { margin: 0 0 6px; font-size: 16px; }
+  .step-item p { margin: 0; font-size: 14px; color: var(--muted); }
+
+  .formula-box {
+    background: #081124;
+    border: 1px solid #263f6e;
+    border-radius: 10px;
+    padding: 13px 16px;
+    margin: 12px 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+    color: #dbeafe;
+    overflow-x: auto;
+    line-height: 1.75;
+  }
+  .formula-box .cmt { color: #7dd3fc; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; font-size: 12.5px; }
+  .sub-h3 { margin: 22px 0 10px; font-size: 17px; color: var(--text); }
+  .tag-inline {
+    display: inline-block; font-size: 11.5px; font-weight: 700;
+    padding: 2px 7px; border-radius: 5px; margin-right: 6px;
+    background: rgba(52,211,153,.14); color: var(--emerald); border: 1px solid rgba(52,211,153,.3);
+  }
+  .tag-inline.cyan { background: rgba(56,189,248,.14); color: var(--cyan); border-color: rgba(56,189,248,.3); }
+  .tag-inline.amber { background: rgba(251,191,36,.14); color: var(--amber); border-color: rgba(251,191,36,.3); }
+  .tag-inline.rose { background: rgba(251,113,133,.14); color: var(--rose); border-color: rgba(251,113,133,.3); }
+
+  footer {
+    margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--border);
+    text-align: center; color: var(--muted); font-size: 12.5px;
+  }
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-inner">
+    <div class="brand"><span class="brand-dot"></span> Geo-ADMM-RL 技术报告</div>
+    <div class="nav-links">
+      <a href="#ch1">1. 问题背景</a>
+      <a href="#ch2">2. 时空冲突图</a>
+      <a href="#ch3">3. 网络架构图解</a>
+      <a href="#ch4">4. 分布式 ADMM 安全层</a>
+      <a href="#ch5">5. 动态对比实验室</a>
+      <a href="#ch6">6. RL 训练与踩坑实录</a>
+      <a href="#ch7">7. 实验成绩单</a>
+    </div>
+  </div>
+</nav>
+
+<div class="container">
+
+  <!-- HERO -->
+  <header class="hero">
+    <span class="pill-tag">本科生友好 · 从零入门到源码级吃透 · 2026-11-24 最新版</span>
+    <h1>从零读懂 Geo-ADMM-RL：<br/>多智能体空中交通防撞的图网络、分布式优化与强化学习</h1>
+    <p>
+      想象天上有 12 架甚至 80 架飞机同时飞过一片交叉空域，它们不能急刹车、转弯要靠机翼倾斜、变高度有惯性。
+      本项目把 <strong>3 层图 Transformer（看全局风险）</strong>、<strong>分布式 ADMM 解析安全层（守住物理安全红线）</strong> 和 <strong>强化学习 TD3（学长期省油避让策略）</strong> 结合在一起，在真实物理仿真器 BlueSky 上实现高安全、强泛化的自主避撞。
+    </p>
+    <div class="kpi-row">
+      <div class="kpi">
+        <div class="k-label">单卡 PPU 训练提速</div>
+        <div class="k-val c-cyan">26,842 轮/h</div>
+        <div class="k-sub">PPU 利用率从 20.6% 拉升至 79%～84%</div>
+      </div>
+      <div class="kpi">
+        <div class="k-label">原生 BlueSky 0.05s 开发集</div>
+        <div class="k-val c-emerald">96.7% 到达</div>
+        <div class="k-sub">348/360 到达，近对头 60/60 零碰撞</div>
+      </div>
+      <div class="kpi">
+        <div class="k-label">正式留出集跃升（12001–12005）</div>
+        <div class="k-val c-amber">48.3% → 89.7%</div>
+        <div class="k-sub">323/360 到达、零越界（向 95%+ 冲刺）</div>
+      </div>
+      <div class="kpi">
+        <div class="k-label">STE 修复梯度反号</div>
+        <div class="k-val c-violet">7/15 → 0/15</div>
+        <div class="k-sub">解决负偏航 Actor-Critic 流形错配</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- CHAPTER 1 -->
+  <section id="ch1">
+    <div class="sec-head"><span class="sec-num">1</span><h2>问题背景：为什么“让飞机不撞车”比打游戏难得多？</h2></div>
+    <p class="sec-lead">先忘掉复杂的公式，用 30 秒搞懂真实空管防撞到底在解决什么痛点。</p>
+
+    <div class="grid-3">
+      <div class="card">
+        <h3 style="margin:0 0 8px;" class="c-cyan">✈️ 物理红线极严苛</h3>
+        <p style="margin:0; font-size:14px; color:var(--muted);">
+          两架飞机只要同时满足<strong>水平距离 &lt; 5 km</strong> 且 <strong>垂直高度差 &lt; 300 ft（91.44 m）</strong>，就算严重碰撞（Loss of Separation）。而且飞机偏离航路中心线超过 <strong>20 km</strong> 就算越界。
+        </p>
+      </div>
+      <div class="card">
+        <h3 style="margin:0 0 8px;" class="c-amber">🐢 延迟与惯性很大</h3>
+        <p style="margin:0; font-size:14px; color:var(--muted);">
+          飞机每 <strong>6 秒</strong>才接收一次控制指令，但底层物理每 <strong>0.05 秒</strong>积分一次（B737 气动模型）。你让它爬升 300 ft，它需要几十秒慢慢爬上去；你让它转弯，它会自动关掉航路跟踪 <code>LNAV</code>，如果不掰回来就会一路飞出界！
+        </p>
+      </div>
+      <div class="card">
+        <h3 style="margin:0 0 8px;" class="c-rose">🕸️ 多机“二次冲突”陷阱</h3>
+        <p style="margin:0; font-size:14px; color:var(--muted);">
+          天上不是只有两架飞机。如果飞机 A 为了躲开 B 盲目下降高度，很可能一头扎进原本安全飞在下层的飞机 C——这就是空管里最头疼的<strong>链式二次冲突</strong>。
+        </p>
+      </div>
+    </div>
+
+    <div class="callout emerald" style="margin-top:18px;">
+      <strong>💡 一句话讲懂本项目的核心设计哲学：</strong><br/>
+      传统离线数学优化（如 MILP/NLP）算得准但飞机一多算不动、怕突发变化；传统端到端 RL（如 SARL）反应快但小网络看不远、容易违规。<br/>
+      <strong>Geo-ADMM-RL 把两者合体：</strong>用 <strong>3 层图 Transformer</strong> 当“大脑”（看穿未来 2 分钟的链式冲突、学会省油的稀疏指令），再把<strong>分布式解析优化 ADMM</strong> 做成“条件反射安全层”（哪怕大脑偶尔犯糊涂，也用数学公式在 6 毫秒内把动作掰回安全区）。
+    </div>
+  </section>
+
+  <!-- CHAPTER 2 -->
+  <section id="ch2">
+    <div class="sec-head"><span class="sec-num">2</span><h2>神经网络怎么“看”天空？—— 时空冲突图（节点 24 维 + 边 18 维）</h2></div>
+    <p class="sec-lead">如果直接把每架飞机的经纬度拼接成长向量喂给 MLP，飞机一增减网络就废了，换个空域就过拟合。我们把空域建模成一张<strong>物理图 G(t) = (V, E)</strong>。</p>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3 style="margin:0 0 10px;" class="c-cyan">🟦 节点特征：每架飞机自己的 24 维“体检表”</h3>
+        <p style="margin:0 0 10px; font-size:13.5px; color:var(--muted);">全部采用<strong>相对局部坐标系</strong>（保证旋转、平移不变性，换个地图照样认识）：</p>
+        <ul style="margin:0; padding-left:18px; font-size:13.5px; color:var(--text);">
+          <li><strong>运动状态</strong>：速度偏差、高度与目标航路高度差、垂直速度；</li>
+          <li><strong>航路导航</strong>：距离终点剩余航程、偏离航路横向距离 <code>xtk</code>、目标航向夹角 <code>sin/cos</code>、<code>LNAV</code> 开关状态；</li>
+          <li><strong>物理边界</strong>：当前速度离上下限 <code>[200, 300 kts]</code> 还剩多少余量、上下邻近高度层是否被占用；</li>
+          <li><strong>历史与图位置</strong>：上一步动作模式、自己在冲突图里的邻居数量（节点度）。</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 style="margin:0 0 10px;" class="c-violet">🔗 边特征：两架飞机之间的 18 维“物理关系卡”</h3>
+        <p style="margin:0 0 10px; font-size:13.5px; color:var(--muted);">只对 20 km 内且未来存在<strong>既有或潜在冲突风险</strong>的飞机连边（剪掉 80%+ 无关边）：</p>
+        <ul style="margin:0; padding-left:18px; font-size:13.5px; color:var(--text);">
+          <li><strong>3D 相对几何</strong>：相对位置、相对速度矢量、当前水平/垂直距离；</li>
+          <li><strong>连续时间解析预测（源自 Geometry-UAV-CDR）</strong>：不靠时间步离散采样，直接用几何公式算出未来 120s 内的<strong>精确最小间距 <code>d_min</code></strong> 以及进入/退出冲突时间 <code>[t_enter, t_exit]</code>；</li>
+          <li><strong>既有 vs 潜在冲突标记</strong>：不仅标出“照现在飞会撞的”，还标出“现在不撞但一调速/降高就会撞上的”邻居；</li>
+          <li><strong>RSTD 速度禁行区</strong>：算出哪一段速度区间绝对不能选，直接告诉网络！</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout" style="margin-top:16px;">
+      <strong>🧩 图论剪枝的妙处（连通分量 + 图着色）：</strong>
+      在每个 6 秒控制步，先按冲突边把全空域拆成几个互不相连的<strong>独立子图（连通分量）</strong>——没有连边的孤立飞机直接 <code>Hold</code> 省油巡航；子图内部用<strong>图着色</strong>给相邻冲突飞机涂不同颜色，同色飞机互不冲突可 100% 并行协商，避免两架飞机同步乱让陷入震荡！
+    </div>
+
+    <h3 class="sub-h3">📐 细节深挖：不用时间步采样，怎么“一步解析”算出冲突与潜在冲突？</h3>
+    <div class="card">
+      <p style="margin:0 0 10px; font-size:14px; color:var(--muted);">
+        传统方法把未来 120 秒切成 120 份逐秒查距离，既慢又容易在两秒之间漏检碰撞。本项目借鉴了 <strong>Geometry-UAV-CDR</strong> 的连续时间解析思想：假设两架飞机在预测窗口 <code>[0, H]</code>（<code>H = 120s</code>）内做相对匀速运动，设初始相对位置为 <code>Δp = p_j - p_i</code>，相对速度为 <code>Δv = v_j - v_i</code>：
+      </p>
+      <div class="formula-box">
+        t_cpa = clamp( -(Δp · Δv) / (||Δv||² + ε),  0,  H )   <span class="cmt">// 最近会遇时刻（解析求导置零！）</span><br/>
+        d_min = || Δp + Δv · t_cpa ||                        <span class="cmt">// 窗口内连续时间精确最小水平距离</span><br/>
+        margin = d_min - r_safe    (r_safe = 5.0 km)         <span class="cmt">// 安全裕度：&lt; 0 为既有冲突，接近 0 为潜在冲突</span>
+      </div>
+      <div class="grid-3" style="margin-top:12px;">
+        <div style="background:rgba(7,13,26,.55); border:1px solid var(--border); border-radius:10px; padding:12px 14px;">
+          <span class="tag-inline rose">既有冲突边</span>
+          <p style="margin:6px 0 0; font-size:13px; color:var(--muted);">照当前速度飞下去 <code>d_min &lt; 5km</code> 且垂直高差 <code>&lt; 300ft</code>——<strong>必须立刻消解</strong>。</p>
+        </div>
+        <div style="background:rgba(7,13,26,.55); border:1px solid var(--border); border-radius:10px; padding:12px 14px;">
+          <span class="tag-inline amber">潜在冲突边</span>
+          <p style="margin:6px 0 0; font-size:13px; color:var(--muted);">当前时间错开了，但空间航段最小距离 <code>&lt; 5km</code>（或位于 ±300ft 相邻高度层）——<strong>防二次冲突的关键！</strong></p>
+        </div>
+        <div style="background:rgba(7,13,26,.55); border:1px solid var(--border); border-radius:10px; padding:12px 14px;">
+          <span class="tag-inline cyan">RSTD 速度禁行区</span>
+          <p style="margin:6px 0 0; font-size:13px; color:var(--muted);">直接解二次不等式 <code>d_min(v_i) &lt; r_safe</code>，算出绝对不能选的速度区间 <code>[v_lo, v_hi]</code> 喂进边特征。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CHAPTER 3 -->
+  <section id="ch3">
+    <div class="sec-head"><span class="sec-num">3</span><h2>核心网络架构图解（点击图中任意模块查看源码级白话解析）</h2></div>
+    <p class="sec-lead">这张图严格对应实际运行的 <code>models/graphformer.py</code>。你可以点击任意方框，查看它在干什么、张量形状怎么变、为什么这样设计。</p>
+
+    <div class="arch-wrap">
+      <svg class="arch-svg" viewBox="0 0 1040 430" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#64748b"/>
+          </marker>
+          <marker id="arr-cyan" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#38bdf8"/>
+          </marker>
+          <marker id="arr-em" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#34d399"/>
+          </marker>
+        </defs>
+
+        <!-- Background Group Boxes -->
+        <rect x="12" y="16" width="1016" height="252" rx="14" fill="rgba(17,29,54,0.45)" stroke="#1e355e" stroke-dasharray="6 4"/>
+        <text x="26" y="38" fill="#38bdf8" font-size="12.5" font-weight="700">ACTOR 决策与分布式协同侧（在线推理时运行）</text>
+
+        <rect x="12" y="284" width="1016" height="134" rx="14" fill="rgba(26,20,52,0.4)" stroke="#3b2f66" stroke-dasharray="6 4"/>
+        <text x="26" y="306" fill="#a78bfa" font-size="12.5" font-weight="700">TWIN PER-AGENT CRITIC 价值评估侧（仅训练期运行，给 Actor 打分指路）</text>
+
+        <!-- Arrows Actor -->
+        <line x1="176" y1="145" x2="220" y2="145" stroke="#38bdf8" stroke-width="2" marker-end="url(#arr-cyan)"/>
+        <line x1="435" y1="115" x2="485" y2="95" stroke="#38bdf8" stroke-width="2" marker-end="url(#arr-cyan)"/>
+        <line x1="435" y1="175" x2="485" y2="195" stroke="#38bdf8" stroke-width="2" marker-end="url(#arr-cyan)"/>
+        <line x1="705" y1="95" x2="758" y2="132" stroke="#34d399" stroke-width="2" marker-end="url(#arr-em)"/>
+        <line x1="705" y1="195" x2="758" y2="162" stroke="#34d399" stroke-width="2" marker-end="url(#arr-em)"/>
+
+        <!-- Arrow to Critic -->
+        <path d="M 888 232 L 888 260 L 105 260 L 105 322" fill="none" stroke="#a78bfa" stroke-width="1.8" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+        <text x="415" y="254" fill="#c4b5fd" font-size="11.5">训练期：把投影后执行动作 a_exec (STE) + 24步(144s)多步回报送入 Critic</text>
+
+        <!-- Arrows Critic -->
+        <line x1="255" y1="362" x2="318" y2="362" stroke="#a78bfa" stroke-width="2" marker-end="url(#arr)"/>
+        <line x1="595" y1="362" x2="658" y2="362" stroke="#a78bfa" stroke-width="2" marker-end="url(#arr)"/>
+
+        <!-- Node 1: Graph Input -->
+        <g class="svg-node active" data-mod="input">
+          <rect x="28" y="75" width="148" height="140" rx="12" fill="#0f1f3d" stroke="#38bdf8" stroke-width="1.6"/>
+          <text x="102" y="102" text-anchor="middle" fill="#38bdf8" font-size="12" font-weight="700">1. 时空冲突图输入</text>
+          <text x="102" y="128" text-anchor="middle" fill="#e2e8f0" font-size="12">节点: [B, N, 24]</text>
+          <text x="102" y="150" text-anchor="middle" fill="#e2e8f0" font-size="12">边: [B, N, N, 18]</text>
+          <text x="102" y="172" text-anchor="middle" fill="#94a3b8" font-size="11">邻接掩码 adj + active</text>
+          <text x="102" y="198" text-anchor="middle" fill="#34d399" font-size="11">点击查看详情 ▸</text>
+        </g>
+
+        <!-- Node 2: GraphFormer -->
+        <g class="svg-node" data-mod="graphformer">
+          <rect x="224" y="62" width="210" height="166" rx="12" fill="#13264a" stroke="#60a5fa" stroke-width="1.6"/>
+          <text x="329" y="88" text-anchor="middle" fill="#60a5fa" font-size="12.5" font-weight="700">2. 共享主干: GraphFormer</text>
+          <text x="329" y="112" text-anchor="middle" fill="#e2e8f0" font-size="12">3 层 Edge-Biased Transformer</text>
+          <text x="329" y="134" text-anchor="middle" fill="#e2e8f0" font-size="12">width=256 · 8 Heads (每头32)</text>
+          <text x="329" y="156" text-anchor="middle" fill="#94a3b8" font-size="11">Pre-LN + SwiGLU + 边嵌入同步更新</text>
+          <text x="329" y="178" text-anchor="middle" fill="#fbbf24" font-size="11.5">具备 3-hop 链式冲突推理能力</text>
+          <text x="329" y="206" text-anchor="middle" fill="#34d399" font-size="11">输出 nodes[256] + edges[256] ▸</text>
+        </g>
+
+        <!-- Node 3: Sparse Control Head -->
+        <g class="svg-node" data-mod="sparse_head">
+          <rect x="490" y="48" width="214" height="96" rx="12" fill="#132a46" stroke="#38bdf8" stroke-width="1.6"/>
+          <text x="597" y="70" text-anchor="middle" fill="#38bdf8" font-size="12" font-weight="700">3A. 稀疏控制头 (SC-MoE)</text>
+          <text x="597" y="90" text-anchor="middle" fill="#e2e8f0" font-size="11.5">Router(4选1): Hold/Spd/Alt/Hdg</text>
+          <text x="597" y="108" text-anchor="middle" fill="#94a3b8" font-size="11">Spd(2段) · Alt(3层) · Hdg(0.05死区)</text>
+          <text x="597" y="128" text-anchor="middle" fill="#34d399" font-size="11">保证单步至多动1个轴 ▸</text>
+        </g>
+
+        <!-- Node 4: ADMM Warmstart Head -->
+        <g class="svg-node" data-mod="admm_head">
+          <rect x="490" y="154" width="214" height="92" rx="12" fill="#1b264a" stroke="#fbbf24" stroke-width="1.6"/>
+          <text x="597" y="176" text-anchor="middle" fill="#fbbf24" font-size="12" font-weight="700">3B. ADMM 神经热启动头</text>
+          <text x="597" y="196" text-anchor="middle" fill="#e2e8f0" font-size="11.5">边头: 速度/高度 dual + rho</text>
+          <text x="597" y="214" text-anchor="middle" fill="#94a3b8" font-size="11">节点头: 让步意愿 s_i → β_ij</text>
+          <text x="597" y="234" text-anchor="middle" fill="#34d399" font-size="11">数学强制双边对称 ▸</text>
+        </g>
+
+        <!-- Node 5: Safety Layer -->
+        <g class="svg-node" data-mod="safety">
+          <rect x="762" y="66" width="248" height="164" rx="12" fill="#0d2b2e" stroke="#34d399" stroke-width="1.8"/>
+          <text x="886" y="92" text-anchor="middle" fill="#34d399" font-size="12.5" font-weight="700">4. 分层分布式安全层</text>
+          <text x="886" y="116" text-anchor="middle" fill="#e2e8f0" font-size="11.5">Tier 1: K=2~4 轮分布式 ADMM</text>
+          <text x="886" y="136" text-anchor="middle" fill="#e2e8f0" font-size="11.5">Tier 2: 三机联合高度搜索 (6.82ms)</text>
+          <text x="886" y="156" text-anchor="middle" fill="#e2e8f0" font-size="11.5">+ 逐机局部航向保护</text>
+          <text x="886" y="178" text-anchor="middle" fill="#fbbf24" font-size="11">低频空窗自动切换 120s MPC</text>
+          <text x="886" y="206" text-anchor="middle" fill="#34d399" font-size="11">输出安全执行指令 a_exec ▸</text>
+        </g>
+
+        <!-- Node 6: Critic Input -->
+        <g class="svg-node" data-mod="critic_in">
+          <rect x="28" y="324" width="226" height="76" rx="12" fill="#1e193d" stroke="#a78bfa" stroke-width="1.5"/>
+          <text x="141" y="348" text-anchor="middle" fill="#c4b5fd" font-size="12" font-weight="700">5A. Critic 联合输入</text>
+          <text x="141" y="368" text-anchor="middle" fill="#e2e8f0" font-size="11.5">Concat(节点24 + 动作8) = 32维</text>
+          <text x="141" y="386" text-anchor="middle" fill="#94a3b8" font-size="11">+ 同样 18维解析边特征 ▸</text>
+        </g>
+
+        <!-- Node 7: Twin Critic -->
+        <g class="svg-node" data-mod="twin_critic">
+          <rect x="322" y="320" width="272" height="84" rx="12" fill="#231c47" stroke="#a78bfa" stroke-width="1.6"/>
+          <text x="458" y="344" text-anchor="middle" fill="#c4b5fd" font-size="12" font-weight="700">5B. Twin Per-Agent Critic (Q1 &amp; Q2)</text>
+          <text x="458" y="365" text-anchor="middle" fill="#e2e8f0" font-size="11.5">两套独立 3层 GraphFormer + SiLU MLP</text>
+          <text x="458" y="385" text-anchor="middle" fill="#fbbf24" font-size="11">逐机输出 Q_i，取 min(Q1, Q2) 防高估 ▸</text>
+        </g>
+
+        <!-- Node 8: STE Update -->
+        <g class="svg-node" data-mod="ste_update">
+          <rect x="662" y="320" width="348" height="84" rx="12" fill="#2b1b38" stroke="#fb7185" stroke-width="1.6"/>
+          <text x="836" y="344" text-anchor="middle" fill="#fb7185" font-size="12" font-weight="700">5C. TD3 双对齐更新（治好梯度反号！）</text>
+          <text x="836" y="365" text-anchor="middle" fill="#e2e8f0" font-size="11.5">24步(144s)回报 · 投影目标动作 · STE 评 Q</text>
+          <text x="836" y="385" text-anchor="middle" fill="#34d399" font-size="11">延迟2步更新 Actor + 成对左右镜像回放 ▸</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="arch-inspector" id="archInspector"></div>
+
+    <h3 class="sub-h3">🔍 逐层前向数据流拆解（本科生也能跟着算一遍！）</h3>
+    <div class="card" style="margin-bottom:16px;">
+      <p style="margin:0 0 10px; font-size:14px; color:var(--muted);">
+        假设一次并行处理 <code>B</code> 个空域、每个空域最多 <code>N</code> 架飞机，下面完整追踪一条观测穿过 <code>models/graphformer.py</code> 的每一步计算：
+      </p>
+      <div class="formula-box">
+        <span class="cmt">// Step 1: 线性投影到隐空间 width = 256</span><br/>
+        h^(0) = Linear(24 → 256)(node_features)       <span class="cmt">// [B, N, 256]</span><br/>
+        e^(0) = Linear(18 → 256)(edge_features) * adj <span class="cmt">// [B, N, N, 256]，无冲突边强制清零</span><br/><br/>
+        <span class="cmt">// Step 2: 重复 3 层 Edge-Biased GraphLayer（每层 8 头，每头 d_k = 32）</span><br/>
+        Q, K, V = split( Linear(LayerNorm(h)) )       <span class="cmt">// 各 [B, N, 8, 32]</span><br/>
+        E_K, E_V, bias = MLP(e)                       <span class="cmt">// 边特征变成注意力偏置与键值修正</span><br/>
+        Attn_ij = Softmax_j( (Q_i · (K_j + E_K_ij)) / √32 + bias_ij )  <span class="cmt">// 只在冲突邻居 + 自身上聚合</span><br/>
+        h' = h + OutputLinear( Σ_j Attn_ij · (V_j + E_V_ij) )          <span class="cmt">// 节点吸收邻居风险信息</span><br/>
+        h_next = h' + SwiGLU( LayerNorm(h') )                          <span class="cmt">// 门控前馈网络 (4x 隐层)</span><br/>
+        e_next = LayerNorm( e + MLP( e + Send(h_next_i) + Recv(h_next_j) ) ) <span class="cmt">// 边嵌入同步进化！</span><br/><br/>
+        <span class="cmt">// Step 3A: 稀疏控制头 (SC-MoE)</span><br/>
+        mode = GumbelSoftmax( Router(h^(3)), hard=True )   <span class="cmt">// 4 选 1: [Hold, Speed, Alt, Hdg]</span><br/>
+        hdg_out = raw_hdg + ( where(|raw_hdg| ≥ 0.05, raw_hdg, 0) - raw_hdg ).detach() <span class="cmt">// STE 0.05 死区保 LNAV</span><br/><br/>
+        <span class="cmt">// Step 3B: ADMM 神经热启动头（强制数学双边对称）</span><br/>
+        dual_ij = 0.5 * ( d_ij + flip(d_ji) )              <span class="cmt">// 保证飞机 i 和 j 看到的对偶初值互为镜像</span><br/>
+        rho_ij  = Softplus( 0.5 * (p_ij + p_ji) ) + 0.1    <span class="cmt">// 正惩罚系数，bias 初始化 7.9 防起步发散</span><br/>
+        β_ij    = s_i / (s_i + s_j),  s_i = Softplus(Linear(h_i)) + 1e-3  <span class="cmt">// 严格满足 β_ij + β_ji = 1</span>
+      </div>
+    </div>
+
+    <div class="card" style="padding:10px 0;">
+      <table>
+        <thead>
+          <tr>
+            <th>对比维度</th>
+            <th>原论文 SARL (ICML 2026)</th>
+            <th>本项目 Geo-ADMM-RL</th>
+            <th>带来的直接好处</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>感知主干容量</strong></td>
+            <td>1 层 4 头 GAT（width=128，~0.1M）</td>
+            <td><strong class="c-cyan">3 层 8 头 Edge-Biased GraphFormer</strong>（width=256，~2.8M）</td>
+            <td>视野从 1-hop 扩展到 <strong>3-hop 链式推理</strong>，提前看见二次冲突</td>
+          </tr>
+          <tr>
+            <td><strong>边信息融合</strong></td>
+            <td>只看固定最近 5 个邻居，单向聚合</td>
+            <td><strong class="c-cyan">18 维解析物理边 + 每层节点/边双向更新</strong></td>
+            <td>不限邻居个数，且输出进化后的边表征直接驱动 ADMM</td>
+          </tr>
+          <tr>
+            <td><strong>安全层设计</strong></td>
+            <td>启发式 KSS（不可微、乱切航向关 LNAV）</td>
+            <td><strong class="c-emerald">分布式 ADMM + 三机分层搜索 + 逐机局部航向保护</strong></td>
+            <td>优先微调速度、保 LNAV、防跨层二次碰撞，512 空域仅 6.82ms</td>
+          </tr>
+          <tr>
+            <td><strong>Critic 架构</strong></td>
+            <td>单 Critic（早期全空域均值池化）</td>
+            <td><strong class="c-violet">Twin Per-Agent GraphFormer Critic</strong>（逐机 Q_i 取 min）</td>
+            <td>信用分配精确到单机，大幅抑制 Q 值高估与种子方差</td>
+          </tr>
+          <tr>
+            <td><strong>泛化范式</strong></td>
+            <td>Case 1 / 2 / 3 各自单独训练 3 个模型</td>
+            <td><strong class="c-amber">单个统一模型覆盖 6 类场景 + 镜像增强</strong></td>
+            <td>告别单场景过拟合，支持跨拓扑与规模外推</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- CHAPTER 4 -->
+  <section id="ch4">
+    <div class="sec-head"><span class="sec-num">4</span><h2>分布式 MPC-ADMM 安全层：不用“总调度员”怎么集体避撞？</h2></div>
+    <p class="sec-lead">本科生最容易问：这么多飞机没有中央总控，怎么避免互相撞上或者陷入僵局？答案是 <strong>ADMM 三步分账法 + 滚动预测 MPC</strong>。</p>
+
+    <div class="step-list">
+      <div class="step-item">
+        <div class="step-icon">1</div>
+        <div>
+          <h4>第一步：各自算小账（Primal 更新 —— 本地极速闭式）</h4>
+          <p>每架飞机先不管复杂的避撞方程，只平衡“我最想飞的省油动作 <code>u_raw</code>”和“上一轮跟邻居商量好的参考值 <code>z_ij</code>”。因为不含非线性碰撞约束，直接一行公式算出自己的新提案。</p>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-icon">2</div>
+        <div>
+          <h4>第二步：冲突邻居一对一碰头（Consensus 解析投影 —— 优先调速、再分层）</h4>
+          <p>只向<strong>冲突图里有连边的邻居</strong>发一条极短消息，每条边独立解一个超小的 <strong>2 机连续时间解析投影</strong>（复用 6 种几何情况公式）：先看能不能仅靠微调速度避开（不关 LNAV、最省油）；如果像对头/六航路中心那样纯调速无解，则自动升级到 <strong>Tier 2 三机联合高度层搜索</strong>（按有效空域分块后，512 个空域并行求解仅需 <strong>6.82 ms</strong>！）和<strong>逐机局部航向保护</strong>。</p>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-icon">3</div>
+        <div>
+          <h4>第三步：记“矛盾账本”（Dual 对偶更新 —— 自动化解多机死锁）</h4>
+          <p>如果飞机 A 同时夹在 B 和 C 中间，B 让 A 加速、C 让 A 减速，A 就把分歧累加到边账本 <code>λ_ij</code> 里。下一轮分歧越大的边权重越高，自动把压力传导给周围空旷的邻居让它多让一步！由于 <strong>GraphFormer 提前给出了聪明的神经热启动 <code>(dual, rho, willingness)</code></strong>，原本要聊 10～20 轮的 ADMM 现在只需 <strong>K = 2 轮</strong>就能快速收敛。</p>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-icon">📡</div>
+        <div>
+          <h4>进阶：低频通信 / 丢包怎么办？—— 空窗步 120s MPC 预测兜底</h4>
+          <p>真实天空通信可能延迟（1～2 步）、丢包（20%），或者每 18 秒才通一次信。我们加上了 <code>--admm-gap-policy mpc</code>：没收到新消息的空窗步里，飞机直接拿上一轮协商好的轨迹，用局部 120 秒滚动预测筛选安全动作，在 18s 低频通信实测中把到达/碰撞从 <code>7/4</code> 直接拉到了 <strong><code>11/0</code>（零碰撞）</strong>！</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h4 style="margin:0 0 8px;" class="c-cyan">🧮 本科生秒懂的 ADMM 三步迭代公式 &amp; 多机死锁调和例子</h4>
+      <div class="formula-box">
+        <span class="cmt">// ① 本地 Primal 更新（无碰撞约束，一行闭式加权平均！）</span><br/>
+        u_i^(k) = Clip( [ W_i · u_i^(0) + Σ_{j∈N_i} ρ_ij · (z_ij^(k-1) - λ_ij^(k-1)) ] / [ W_i + Σ_{j∈N_i} ρ_ij ] )<br/><br/>
+        <span class="cmt">// ② 冲突边 Consensus 解析投影（仅相邻冲突机通信，2 机微秒级投影）</span><br/>
+        (z_ij^(k), z_ji^(k)) = Project_{d_min(z_i, z_j) ≥ r_s} ( u_i^(k) + λ_ij^(k-1),  u_j^(k) + λ_ji^(k-1);  β_ij )<br/><br/>
+        <span class="cmt">// ③ 本地 Dual 矛盾账本更新（分歧不断累加，逼迫空旷邻居主动让步）</span><br/>
+        λ_ij^(k) = λ_ij^(k-1) + u_i^(k) - z_ij^(k)
+      </div>
+      <p style="margin:8px 0 0; font-size:13.8px; color:var(--muted);">
+        <strong>举个生活算例：</strong>假设六航路中心 <strong>飞机 A</strong> 同时和 <strong>B、C</strong> 有冲突：B 希望 A 加速 +4 kts，C 希望 A 减速 -4 kts。第 1 轮里 A 折中不动（0 kts），于是边 (A,B) 的账本记下分歧 <code>-4</code>、边 (A,C) 记下 <code>+4</code>；第 2 轮里如果 B 周围没其他飞机（<code>s_B</code> 让步意愿大），账本压力就会直接把 B 推向“自己大幅减速让路”，而 C 微微加速——<strong>完全不需要中央总控，三机僵局在 2 轮局部对话内自然解开！</strong>
+      </p>
+    </div>
+  </section>
+
+  <!-- CHAPTER 5: INTERACTIVE SIMULATION LAB -->
+  <section id="ch5">
+    <div class="sec-head"><span class="sec-num">5</span><h2>3D 冲突消解动态对比实验室（支持鼠标拖拽旋转 3D 视角）</h2></div>
+    <p class="sec-lead">百闻不如一见！切换下面 3 个经典实战场景，<strong>按住画布拖动鼠标即可 360° 同步旋转左右双屏的 3D 空域</strong>，通过地面投影、垂直高度垂线、3D 立体爬升尾迹和 3D 保护圆柱体，直观看到飞机如何在三维空间爬升错层与回航！</p>
+
+    <div class="sim-tabs" id="simTabs">
+      <button class="btn active" data-scene="crossing6">场景 1：六航路中心交叉（关投影 8/12 撞 4 架 vs 开投影 12/12 零碰撞）</button>
+      <button class="btn" data-scene="headon">场景 2：近对头高压冲突（纯 Hold 迎头相撞 vs Geo-ADMM 提前错峰分层）</button>
+      <button class="btn" data-scene="yaw">场景 3：-15° 初始偏航 + 关 LNAV（旧保护越界 vs 逐机保护自主回航）</button>
+    </div>
+
+    <div class="sim-stage">
+      <div class="sim-controls" style="margin-top:0; padding-top:0; border-top:none; margin-bottom:12px;">
+        <span style="font-size:12.5px; color:var(--muted);">3D 视角预设（或直接拖拽画面自由旋转）：</span>
+        <button class="btn active" id="view3d">🧊 3D 立体视角</button>
+        <button class="btn" id="viewSide">📐 侧视高度剖面</button>
+        <button class="btn" id="viewTop">🗺️ 2D 俯视图</button>
+        <span id="camAngles" style="font-family:ui-monospace,monospace; font-size:12px; color:var(--muted); margin-left:auto;">Yaw -32° · Pitch 26°</span>
+      </div>
+      <div style="display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--muted); margin-bottom:10px; padding:6px 10px; background:rgba(17,29,54,.6); border-radius:8px; border:1px solid var(--border);">
+        <span>图例（所有箭头均为飞机）：</span>
+        <span><strong style="color:#38bdf8;">▶ 蓝色</strong> = 正常错峰巡航飞机</span>
+        <span><strong style="color:#fbbf24;">▶ 金色</strong> = 重点观察冲突对</span>
+        <span><strong style="color:#34d399;">▶ 绿色</strong> = 主动爬升避让 / 已安全抵达</span>
+        <span><strong style="color:#a78bfa;">▶ 紫色</strong> = 主动下降避让</span>
+        <span><strong style="color:#fb7185;">💥 红色</strong> = 发生碰撞</span>
+      </div>
+
+      <div class="sim-canvases">
+        <div class="pane">
+          <div class="pane-head">
+            <span id="leftTitle">左侧：关闭安全投影</span>
+            <span id="leftBadge" class="c-rose"></span>
+          </div>
+          <canvas id="canvasLeft" width="560" height="390"></canvas>
+          <div class="pane-foot" id="leftFoot"></div>
+        </div>
+        <div class="pane">
+          <div class="pane-head">
+            <span id="rightTitle">右侧：开启 Geo-ADMM 分层投影</span>
+            <span id="rightBadge" class="c-emerald"></span>
+          </div>
+          <canvas id="canvasRight" width="560" height="390"></canvas>
+          <div class="pane-foot" id="rightFoot"></div>
+        </div>
+      </div>
+
+      <div class="sim-controls">
+        <button class="btn primary" id="btnPlay">⏸ 暂停</button>
+        <button class="btn" id="btnReset">↺ 重播</button>
+        <button class="btn" id="btnSpeed">速度: 1.0x</button>
+        <input type="range" id="timeSlider" min="0" max="1000" value="0" />
+        <span id="timeLabel" style="font-family:ui-monospace,monospace; font-size:13px; min-width:95px; text-align:right;">t = 00:00</span>
+      </div>
+      <div class="sim-controls" id="jumpBar" style="margin-top:8px; padding-top:8px; border-top:1px dashed var(--border);"></div>
+      <div class="sim-story" id="simStory"></div>
+    </div>
+  </section>
+
+  <!-- CHAPTER 6 -->
+  <section id="ch6">
+    <div class="sec-head"><span class="sec-num">6</span><h2>RL 是怎么一步步训练出来的？（三阶段管线 + 真实踩坑破局实录）</h2></div>
+    <p class="sec-lead">做强化学习最怕“写完代码直接开训，结果死活不收敛”。这个项目最大的工程含金量，在于如何把 1 张 PPU 用到极致，以及如何一步步用数据诊断治好 RL 的经典顽疾。</p>
+
+    <div class="card" style="margin-bottom:18px;">
+      <h3 style="margin:0 0 12px;" class="c-cyan">🚀 三阶段 Sim-to-Sim 训练管线（如何把 44 天压成几小时？）</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>训练阶段</th>
+            <th>跑在什么仿真器上？</th>
+            <th>在学什么？</th>
+            <th>实测速度与 PPU 利用率</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Stage 0<br/>专家冷启动 (BC)</strong></td>
+            <td>离线解析求解器生成<br/>2,048 个场景（1,418 有效）</td>
+            <td>先让大模型通过“模仿学习”抄懂解析优化器的调速+分层套路，避免 RL 从随机瞎飞开始浪费时间。</td>
+            <td>验证集动作 MSE <code>0.0455</code>，几十分钟完成</td>
+          </tr>
+          <tr>
+            <td><strong>Stage 1<br/>方案 B GPU 批量预训练</strong></td>
+            <td>自研 <code>bluesky-for-rl</code> 方案 B<br/><strong>512 个 PPU 常驻向量化空域</strong></td>
+            <td>纯 PyTorch 张量跑 B737 物理（逐帧误差 &lt; 10⁻¹¹），在 6 类混合随机拓扑里疯狂刷几万轮 RL，打牢泛化底子。</td>
+            <td><strong class="c-emerald">26,842 轮/h</strong>（满载训练 ~10k 轮/h）<br/>PPU 利用率 <strong>78%～84%</strong></td>
+          </tr>
+          <tr>
+            <td><strong>Stage 2<br/>方案 A 原生高保真微调</strong></td>
+            <td>自研 <code>bluesky-for-rl</code> 方案 A<br/><strong>9 CPU workers × 8 打包原生空域</strong></td>
+            <td>回到 100% 原生 BlueSky（去冗余模块 + 绕开文本命令栈，误差为 0），专门消除简化运动学到真实气动的最后一点 Sim-to-Sim 差距。</td>
+            <td><strong class="c-cyan">4,827 轮/h</strong>（比原生提速最高 20×）<br/>PPU 利用率 <strong>73.2%</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h4 style="margin:0 0 8px;" class="c-amber">坑 1：为什么 1 步 TD 看不见 2 分钟后的撞机？</h4>
+        <p style="margin:0; font-size:13.5px; color:var(--muted);">
+          <strong>现象：</strong>飞机提前 1 分钟微微减速就能避免六航路相撞，但旧版 Critic（1 步 TD）给 4 个正确提前避碰方案只认出 <strong>1/4</strong>。<br/>
+          <strong>解法：</strong>升级为 <strong>24 步（144 秒）多步回报</strong>（<code>--return-window 24 --multi-step-return</code>），把 2 分钟后交叉点的撞机惩罚直接折现传回当前步，Critic 识别率立刻跃升至 <strong>3/4～4/4</strong>！
+        </p>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 8px;" class="c-rose">坑 2：为什么 Actor 越训负偏航越差？（46.7% 梯度反号！）</h4>
+        <p style="margin:0; font-size:13.5px; color:var(--muted);">
+          <strong>现象：</strong>Critic 一直是在“安全层投影后的动作 <code>a_exec</code>”上训练的，但 Actor 却把“未投影的 <code>a_raw</code>”直接喂给 Critic 求梯度，导致 <code>a_raw</code> 处属于分布外（OOD），负偏航竟有 <strong>7/15 批次梯度指反了方向</strong>！<br/>
+          <strong>解法：</strong>引入 <strong><code>--projected-actor-ste</code></strong>（前向用 <code>a_exec</code> 给 Critic 精准打分，反向梯度通过直通估计器传回 Actor），负偏航反号瞬间从 <strong>7/15 归零到 0/15</strong>！
+        </p>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 8px;" class="c-violet">坑 3：为什么 +15° 偏航满分，-15° 总是掉链子？</h4>
+        <p style="margin:0; font-size:13.5px; color:var(--muted);">
+          <strong>现象：</strong>明明左右镜像对称的任务，+15° 经常 <code>36/36</code>，-15° 却老掉到 <code>31/36</code>，而且旧保护逻辑一刀切清零航向导致偏航全越界。<br/>
+          <strong>解法：</strong>① 改成<strong>逐机局部航向保护</strong>（只拦危险转向，放行孤立飞机回航）；② 加入 <strong><code>--mirror-replay</code> 左右镜像数据增强</strong>，把每一条样本水平翻转成对入库，直接抹平左右不对称。
+        </p>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 8px;" class="c-emerald">坑 4（硬核科研彩蛋）：2 毫米的“假安全”擦边碰撞！</h4>
+        <p style="margin:0; font-size:13.5px; color:var(--muted);">
+          <strong>最新定位：</strong>垂直撞机红线是 <strong>300 ft = 91.44 m</strong>。审计 3 对六航路碰撞发现：安全层用匀速近似算出高差 <code>94.03 / 93.18 / 92.96 m</code>（以为安全放行了），但原生 BlueSky 带 <code>300 fpm</code> 垂向加速度惯性跑出来的真实高差是 <strong><code>91.187 / 91.438 / 91.401 m</code></strong>——就差 <strong>2 毫米到 25 厘米</strong>被判碰撞！用精确 B737 垂向积分复算误差仅 <strong>4.1 微米</strong>，替换后可精准清零这一整类碰撞。
+        </p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px;">
+      <h3 style="margin:0 0 10px;" class="c-violet">⚙️ 一次 TD3 梯度更新里究竟发生了什么？（5 步完整拆解）</h3>
+      <div class="grid-2">
+        <div>
+          <p style="margin:0 0 8px; font-size:13.8px; color:var(--text);"><strong>1. 奖励函数怎么设计？（让飞机“安全、省油、不乱动”）</strong></p>
+          <ul style="margin:0; padding-left:18px; font-size:13.3px; color:var(--muted);">
+            <li><strong>终局奖惩</strong>：安全抵达目的地 <code>+200</code>，发生碰撞 <code>-50</code>，横向偏离 &gt; 20 km 越界重罚；</li>
+            <li><strong>过程引导</strong>：沿航路前进奖励、横向偏移 <code>xtk</code> 惩罚、航向对准奖励；</li>
+            <li><strong>动作成本分级权重</strong>：调速 / 升降 / 航向按 <strong><code>1 : 2 : 4</code></strong> 线性加权——明确告诉 RL“能 Hold 就不动，能微调速度就别升降，尽量别动航向关 LNAV！”；</li>
+            <li><strong>安全层介入归因</strong>：安全层修正动作的惩罚直接记在导致介入的 <code>raw</code> 动作头上。</li>
+          </ul>
+        </div>
+        <div>
+          <p style="margin:0 0 8px; font-size:13.8px; color:var(--text);"><strong>2. 每一步梯度更新的 5 个标准动作（<code>train/td3.py</code>）</strong></p>
+          <ol style="margin:0; padding-left:18px; font-size:13.3px; color:var(--muted);">
+            <li>从 PPU 显存常驻 Replay Buffer 抽一批 24 步（144s）多步回报转移（含左右镜像样本）；</li>
+            <li>用 <code>Target Actor</code> 算下一步动作，经<strong>同一安全投影</strong>得到 <code>a_next_exec</code>，算 <code>y_i = R_24 + γ^24 · min(Q1', Q2')</code>；</li>
+            <li>用 Smooth L1 Loss 同步更新 <strong>Twin Critic (Q1, Q2)</strong>，梯度裁剪 <code>5.0</code>；</li>
+            <li><strong>每 2 步延迟更新 Actor</strong>：前向用 <code>a_ste = a_raw + (a_exec - a_raw).detach()</code> 让 <code>Q1</code> 精准打分，叠加短期线性衰减锚定（前 2k 步归零），反向更新 Actor（最新还支持 <code>--freeze-actor-encoder</code> 防共享编码器漂移破坏 ADMM 头）；</li>
+            <li>对 Target Actor / Target Critic 做 <code>τ = 0.005</code> 指数滑动平均软更新。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CHAPTER 7 -->
+  <section id="ch7">
+    <div class="sec-head"><span class="sec-num">7</span><h2>真实实验成绩单（原生 BlueSky 0.05s 逐帧严格评测）</h2></div>
+    <p class="sec-lead">所有最终数字全部回到 <strong>100% 原生 BlueSky、每 0.05 秒逐帧检查碰撞</strong> 下验收，绝不拿简化环境报喜。</p>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3 style="margin:0 0 14px;" class="c-emerald">📈 到达率演进进度（总计 360 架 / 216 架多场景）</h3>
+        <div class="bar-row">
+          <div class="bar-top"><span>Stage 0 行为克隆基线（正式留出 360 架）</span><strong class="c-rose">48.3%（174/360 · 120 越界）</strong></div>
+          <div class="bar-bg"><div class="bar-fill" style="width:48.3%; background:var(--rose);"></div></div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-top"><span>Stage 1 最佳权重 · 关闭投影消融（原生 216 架）</span><strong class="c-amber">75.9%（164/216 · 近对头 36/36）</strong></div>
+          <div class="bar-bg"><div class="bar-fill" style="width:75.9%; background:var(--amber);"></div></div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-top"><span>Stage 1 最佳权重 · 正式留出 12001–12005（360 架）</span><strong class="c-cyan">89.7%（323/360 · 零越界！）</strong></div>
+          <div class="bar-bg"><div class="bar-fill" style="width:89.7%; background:var(--cyan);"></div></div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-top"><span>Stage 1 最佳权重 · 5 种子开发集（360 架）</span><strong class="c-emerald">96.7%（348/360 · 12 碰撞）</strong></div>
+          <div class="bar-bg"><div class="bar-fill" style="width:96.7%; background:var(--emerald);"></div></div>
+        </div>
+        <div class="bar-row" style="margin-bottom:0;">
+          <div class="bar-top"><span>论文正式验收目标（随后触发 Exp 1–6 全套矩阵）</span><strong class="c-violet">≥ 95.0%（留出碰撞 ≤ 3%）</strong></div>
+          <div class="bar-bg"><div class="bar-fill" style="width:95%; background:linear-gradient(90deg, var(--violet), var(--emerald));"></div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin:0 0 12px;" class="c-cyan">🧭 接下来最后一步：冲刺 95%+ &amp; 收割全套论文实验</h3>
+        <ul style="margin:0; padding-left:18px; font-size:13.8px; color:var(--text);">
+          <li style="margin-bottom:8px;"><strong>修精确垂向动力学 + 冻结共享编码器微调</strong>：消除 2 毫米～25 厘米擦边假安全碰撞，并防止微调时共享编码器漂移破坏 ADMM 协商头，把正式留出从 <code>89.7%</code> 推过 <code>95%+</code>；</li>
+          <li style="margin-bottom:8px;"><strong>Exp 1（对标 SARL Table 1）</strong>：用已验真的 15 份 Figure 4 统一发机清单，公平对比 Hold+KSS / SARL / Geo-ADMM-RL；</li>
+          <li style="margin-bottom:8px;"><strong>Exp 2 &amp; 3（强泛化外推，入口已通）</strong>：零样本直测 <strong>13 / 15 / 17 条航路</strong> 与 <strong>30 / 50 / 80 架同时并发</strong>；</li>
+          <li><strong>Exp 5 &amp; 6（独有创新消融，61 配置已烟测）</strong>：步内协商轮数 <code>K=0/1/2/3/5</code>、低频通信 <code>6/12/18/30s</code> + 丢包延迟 + MPC 空窗预测、图着色 vs Jacobi、替换回 KSS 消融。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px; padding:10px 0;">
+      <div style="padding:8px 16px 12px; font-weight:700; font-size:15px; color:var(--cyan);">📊 原生 BlueSky 0.05s 六场景逐项落盘对照表（每类 36 架，共 216 架，格式：到达 / 碰撞 / 越界）</div>
+      <table>
+        <thead>
+          <tr>
+            <th>测试场景（每类 36 架）</th>
+            <th>早期 Stage 0 基线（换算）</th>
+            <th>当前最佳 · 关闭投影消融</th>
+            <th>当前最佳 · 开启 ADMM 投影</th>
+            <th>三机分层 + 高度裕度（另组种子）</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>三航路交叉</strong></td>
+            <td>76.7% 到达</td>
+            <td>26 / 10 / 0（72.2%）</td>
+            <td><strong class="c-emerald">36 / 0 / 0（100%）</strong></td>
+            <td>34 / 2 / 0（94.4%）</td>
+          </tr>
+          <tr>
+            <td><strong>四航路交叉</strong></td>
+            <td>50.0% 到达</td>
+            <td>28 / 8 / 0（77.8%）</td>
+            <td><strong class="c-emerald">34 / 2 / 0（94.4%）</strong></td>
+            <td>32 / 4 / 0（88.9%）</td>
+          </tr>
+          <tr>
+            <td><strong>六航路交叉（最难）</strong></td>
+            <td>46.7% 到达</td>
+            <td>22 / 14 / 0（61.1%）</td>
+            <td>28 / 8 / 0（77.8%）</td>
+            <td><strong class="c-cyan">30 / 6 / 0（83.3%）</strong></td>
+          </tr>
+          <tr>
+            <td><strong>近对头高压</strong></td>
+            <td>90.0% 到达</td>
+            <td><strong class="c-emerald">36 / 0 / 0（100%）</strong></td>
+            <td><strong class="c-emerald">36 / 0 / 0（100%）</strong></td>
+            <td><strong class="c-emerald">36 / 0 / 0（100%）</strong></td>
+          </tr>
+          <tr>
+            <td><strong>+15° 初始偏航（关 LNAV）</strong></td>
+            <td>11.7% 到达</td>
+            <td>20 / 16 / 0（55.6%）</td>
+            <td><strong class="c-emerald">36 / 0 / 0（100%）</strong></td>
+            <td>30 / 6 / 0（83.3%）</td>
+          </tr>
+          <tr>
+            <td><strong>-15° 初始偏航（关 LNAV）</strong></td>
+            <td>10.0% 到达</td>
+            <td>32 / 2 / 2（88.9%）</td>
+            <td>32 / 2 / 2（88.9%）</td>
+            <td><strong class="c-emerald">34 / 0 / 2（94.4%）</strong></td>
+          </tr>
+          <tr style="background:rgba(56,189,248,.07);">
+            <td><strong>总计（216 架）</strong></td>
+            <td><strong>47.5% 到达 · 22.8% 碰撞</strong></td>
+            <td><strong>164 / 50 / 2（75.9%）</strong></td>
+            <td><strong class="c-emerald">202 / 12 / 2（93.5%）</strong><br/><span style="font-size:12px;color:var(--muted);">新版三机分层达 204/10/2 (94.4%)</span></td>
+            <td><strong class="c-cyan">196 / 18 / 2（90.7%）</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    Geo-ADMM-RL 技术报告 · 基于真实源码（<code>models/graphformer.py</code> / <code>envs/bluesky_safety.py</code> / <code>train/td3.py</code>）与 Fuyao 单卡 PPU 实测落盘数据编写 · 2026-11-24
+  </footer>
+</div>
+
+<script>
+// =========================================================
+// 1. INTERACTIVE ARCHITECTURE INSPECTOR
+// =========================================================
+const archDocs = {
+  input: {
+    title: "1. 时空冲突图输入（Graph Construction）",
+    shape: "node_features: [B, N, 24]  |  edge_features: [B, N, N, 18]  |  adjacency: [B, N, N]",
+    desc: "不像传统算法把所有飞机硬塞进固定长度数组，这里每架飞机是一个图节点（24 维局部相对状态），只给 20 km 内且未来 120s 存在既有或潜在冲突的飞机之间连边（18 维解析物理边特征，含精确 d_min 裕度、冲突进入/退出时间、RSTD 速度禁行区、跨高度层风险）。这样不管天上是 12 架还是 80 架，网络都能无缝吃进去！"
+  },
+  graphformer: {
+    title: "2. 共享主干：3 层 Edge-Biased GraphFormer",
+    shape: "输入 [B, N, 24] + [B, N, N, 18]  →  输出 nodes [B, N, 256] + edges [B, N, N, 256]",
+    desc: "这是整个系统的“大脑”（相比 SARL 只有 1 层 128 维 GAT，容量和视野全面升级）。每一层 GraphLayer 做三件事：① 把 18 维边特征映射成 edge_keys / edge_values 和注意力偏置 bias，让 8 个注意力头天然聚焦于“快撞上的边”；② 用 Pre-LayerNorm + SwiGLU 更新节点表征；③ 把更新后的两端节点消息反哺更新边嵌入。叠 3 层意味着每架飞机能看穿 3-hop 链式关系（我躲开 A → A 会不会逼近 B → B 会不会撞 C）！"
+  },
+  sparse_head: {
+    title: "3A. 稀疏控制头（SC-MoE：一次只发一条清晰指令）",
+    shape: "logits [B, N, 4] → mode [B, N, 4] | speed [B, N, 2] | alt [B, N, 1] | hdg [B, N, 1]",
+    desc: "真实空管员不会同时让飞机又变速、又爬升、又转弯。Router 输出 4 个互斥意图 {Hold, Speed, Alt, Hdg}：训练期用 Gumbel-Softmax (hard=True) 既能 4 选 1 又能回传梯度，推理期直接 argmax。特别亮点：航向头加了 |hdg| < 0.05 的 STE 死区——微小噪声直接归零，防止无冲突时误发航向指令把 BlueSky 的 LNAV 自动航路跟踪关掉！"
+  },
+  admm_head: {
+    title: "3B. ADMM 神经热启动与协同头（连接深度学习与数学优化的桥梁）",
+    shape: "dual [B, N, N, 2]  |  rho [B, N, N]  |  willingness s_i [B, N]",
+    desc: "传统分布式 ADMM 冷启动需要互相通信 10~20 轮才能收敛。这里直接从 GraphFormer 更新后的边嵌入预测速度与高度的初始对偶账本 dual 和惩罚权重 rho（代码里通过转置平均强制双边对称，保证飞机 i 和 j 看到的约束一致），再从节点预测单机让步意愿 s_i，按 β_ij = s_i/(s_i+s_j) 动态决定谁让步更多——彻底打破死板的 ID 排序或 FCFS，让 ADMM 只需 K=2 轮就收敛！"
+  },
+  safety: {
+    title: "4. 分层分布式安全层（6.82 ms 搞定 512 空域！）",
+    shape: "输入 a_raw + (dual, rho, s_i)  →  输出安全执行动作 a_exec [B, N, 3]",
+    desc: "分两级守护安全红线（水平 5 km、垂直 300 ft）：① Tier 1 用 K=2~4 轮分布式 ADMM 优先做最小代价调速与常规高度协商（不偏航、保 LNAV）；② Tier 2 在多机密集交叉无解时，触发按有效空域分块的三机联合高度层搜索（带 10m 裕度，512 空域中位耗时已从 24.89ms 压到 6.82ms）+ 逐机局部航向保护（放行孤立飞机自主回航）。通信受限时自动启用 120s 局部 MPC 空窗策略。"
+  },
+  critic_in: {
+    title: "5A. Critic 联合输入（把“环境 + 动作”绑在一起评估）",
+    shape: "Concat(node_features[24], action[8]) → [B, N, 32]  +  edge_features[18]",
+    desc: "Critic 的工作是当“考官”：判断在当前空域状态下，所有飞机执行这套联合动作后，未来 2 分钟能拿多少总分。动作编码成 8 维（4 维意图 One-Hot + 速度/高度/航向控制量），和 24 维节点特征拼成 32 维一起送进 Critic 编码器。"
+  },
+  twin_critic: {
+    title: "5B. Twin Per-Agent Critic（双考官打分取低值）",
+    shape: "两套独立 3层 GraphFormer + SiLU MLP  →  Q1 [B, N], Q2 [B, N]",
+    desc: "早期 SARL 只用 1 个全局平均 Critic，既容易把 18 架飞机的奖惩糊成一锅粥，又容易盲目乐观（Q 值过估计）导致不同随机种子方差高达 14%。这里升级成两套独立的 3 层 GraphFormer Critic，给每架飞机单独打分 Q_i，计算目标时取 min(Q1, Q2)，训练稳健度大幅提升。"
+  },
+  ste_update: {
+    title: "5C. TD3 双对齐更新（三大核心稳定器）",
+    shape: "24步(144s)多步回报 · --projected-target-action · --projected-actor-ste · --mirror-replay",
+    desc: "这里藏着项目最关键的 3 个算法突破：① 24 步（144s）多步回报让 Critic 真正看见 2 分钟后交叉点的撞机惩罚；② 目标动作走同一安全投影，Actor 更新时用 STE 在投影后执行动作流形上评估 Critic，把负偏航梯度反号从 7/15 直接降到 0/15；③ 成对左右镜像回放消除正/负偏航不对称，配合每 2 步延迟更新 Actor 和软更新 Target 网络。"
+  }
+};
+
+function showArch(key) {
+  const d = archDocs[key];
+  document.getElementById("archInspector").innerHTML = `
+    <h3>${d.title}</h3>
+    <div class="tensor-badge">${d.shape}</div>
+    <p style="margin:0; font-size:14.2px; color:var(--text);">${d.desc}</p>
+  `;
+}
+document.querySelectorAll(".svg-node").forEach(g => {
+  g.addEventListener("click", () => {
+    document.querySelectorAll(".svg-node").forEach(x => x.classList.remove("active"));
+    g.classList.add("active");
+    showArch(g.dataset.mod);
+  });
+});
+showArch("input");
+
+// =========================================================
+// 2. INTERACTIVE 3D DUAL-PANE CONFLICT RESOLUTION ANIMATION LAB
+// =========================================================
+const cLeft = document.getElementById("canvasLeft");
+const cRight = document.getElementById("canvasRight");
+const ctxL = cLeft.getContext("2d");
+const ctxR = cRight.getContext("2d");
+
+let currentScene = "crossing6";
+let simT = 0.0;       // normalized [0, 1]
+let playing = true;
+let speedMult = 1.0;
+let lastFrame = performance.now();
+
+// 3D Camera State (synced across both panes)
+let camYawDeg = -32;   // azimuth rotation
+let camPitchDeg = 26;  // elevation angle (90 = top-down, 5 = side profile)
+let dragging = false;
+let dragStartX = 0, dragStartY = 0;
+
+function lerp(a, b, t) { return a + (b - a) * Math.max(0, Math.min(1, t)); }
+function smoothstep(a, b, x) {
+  const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+}
+
+// World coordinate system:
+//   wx, wy in [-120, 120] (horizontal km-scaled plane)
+//   altFt in [19400, 21000] ft -> mapped to vertical z in [0, 130] (exaggerated vertically so 300ft is vividly clear!)
+const Z_FLOOR_FT = 19500;
+const Z_TOP_FT = 21000;
+function altToZ(altFt) {
+  return ((altFt - Z_FLOOR_FT) / (Z_TOP_FT - Z_FLOOR_FT)) * 128;
+}
+
+function project3D(wx, wy, wz, W, H) {
+  const yaw = camYawDeg * Math.PI / 180;
+  const pitch = camPitchDeg * Math.PI / 180;
+
+  // Center z around mid-altitude (z=52)
+  const cz = wz - 52;
+  // Rotate around Z (yaw)
+  const x1 = wx * Math.cos(yaw) - wy * Math.sin(yaw);
+  const y1 = wx * Math.sin(yaw) + wy * Math.cos(yaw);
+  // Tilt by pitch (looking from +y toward origin)
+  const y2 = y1 * Math.cos(pitch) + cz * Math.sin(pitch);
+  const z2 = -y1 * Math.sin(pitch) + cz * Math.cos(pitch);
+
+  // Mild perspective projection
+  const fov = 560;
+  const dist = 370;
+  const scale = fov / Math.max(80, dist + y2);
+  return {
+    sx: W * 0.5 + x1 * scale,
+    sy: (H - 54) * 0.53 - z2 * scale,
+    depth: y2,
+    scale
+  };
+}
+
+// Scene Definitions in 3D World Coords (wx, wy in [-115, 115], altFt in [19600, 20900])
+const SCENES = {
+  crossing6: {
+    durationSec: 600,
+    leftTitle: "左侧：关闭安全投影（纯策略本体）",
+    rightTitle: "右侧：开启 Geo-ADMM 分层安全投影",
+    leftSummary: "8/12 到达 · 4 架碰撞",
+    rightSummary: "12/12 到达 · 零碰撞",
+    jumps: [
+      { label: "起飞巡航 (01:00)", t: 0.10 },
+      { label: "触发 3D 爬升分层 (04:30)", t: 0.45 },
+      { label: "中心交叉时刻 (06:30)", t: 0.65 },
+      { label: "全部抵达终点 (09:30)", t: 0.95 }
+    ],
+    story: "<strong>3D 对照看点：</strong>六条航路 12 架飞机向中心汇集。你可以直接<strong>拖拽画面旋转</strong>或点击上方<strong>「📐 侧视高度剖面」</strong>：在 <code>t ≈ 04:30</code> 时，右侧的 <strong>Geo-ADMM 安全层</strong> 让高亮的 <strong>AC06（金色）</strong> 明显向上拉起 <strong>+316 ft</strong>、同时让 <strong>AC02</strong> 向上拉起 <strong>+320 ft</strong>，你可以肉眼看到它们的 3D 保护圆柱体从 <strong>AC10 / AC05</strong> 头顶立体掠过（垂直高差 &gt; 300 ft 安全线）；而左侧两对飞机的 3D 圆柱在同一高度层迎面重叠闪红碰撞！",
+    getAircraftAt(t, isProtected, i) {
+      const R = 108;
+      const routeIdx = i % 6;
+      const wave = Math.floor(i / 6);
+      const ang = (routeIdx * Math.PI) / 3 + 0.22;
+      const sx = R * Math.cos(ang), sy = R * Math.sin(ang);
+      const ex = -R * Math.cos(ang), ey = -R * Math.sin(ang);
+
+      // Wave 0 pairs (0,3) and (1,4) arrive at center simultaneously on FL200 (real conflict pairs);
+      // All other background aircraft (blue) have staggered takeoff times & altitudes so they NEVER overlap!
+      const delays = [
+        0.00, 0.04, 0.14, 0.00, 0.04, 0.24,  // wave 0 (i=0..5): (0,3) conflict, (1,4) conflict; 2 & 5 staggered
+        0.10, 0.20, 0.30, 0.16, 0.26, 0.34   // wave 1 (i=6..11): staggered arrivals across FL203/206/209
+      ];
+      const baseAlts = [
+        20000, 20000, 20300, 20000, 20000, 20600,
+        20600, 20900, 20300, 20900, 20600, 20300
+      ];
+
+      const delay = delays[i];
+      let spdFactor = 1.0;
+      let altFt = baseAlts[i];
+      const baseAltFt = baseAlts[i];
+
+      if (isProtected) {
+        if (i === 0) {
+          // AC06 climbs +316 ft cleanly before crossing center
+          altFt = 20000 + 316 * smoothstep(0.22, 0.46, t);
+        } else if (i === 3) {
+          // AC10 slightly slows down & holds lower margin
+          spdFactor = 1.0 - 0.10 * smoothstep(0.20, 0.56, t);
+          altFt = 20000 - 40 * smoothstep(0.26, 0.48, t);
+        } else if (i === 1) {
+          // AC02 climbs +340 ft to clear AC05
+          altFt = 20000 + 340 * smoothstep(0.26, 0.50, t);
+        } else if (i === 4) {
+          // AC05 slightly accelerates to stagger arrival
+          spdFactor = 1.0 + 0.09 * smoothstep(0.24, 0.56, t);
+        }
+      }
+
+      const rawP = (t - delay) * 1.18 * spdFactor;
+      const p = Math.max(0, Math.min(1, rawP));
+      let status = p >= 0.99 ? "GOAL" : "FLY";
+      const hitTime = (i === 0 || i === 3) ? 0.425 : 0.465;
+      if (!isProtected && (i === 0 || i === 3 || i === 1 || i === 4) && t >= hitTime) {
+        status = "COLLISION";
+      }
+      const freezeP = (!isProtected && status === "COLLISION") ? Math.min(p, (hitTime - delay) * 1.18) : p;
+      const wx = lerp(sx, ex, Math.min(1, Math.max(0, freezeP)));
+      const wy = lerp(sy, ey, Math.min(1, Math.max(0, freezeP)));
+
+      return {
+        id: i === 0 ? "AC06" : (i === 3 ? "AC10" : `AC${String(i+1).padStart(2,"0")}`),
+        wx, wy, altFt, baseAltFt,
+        sx, sy, ex, ey,
+        status,
+        highlight: (i === 0 || i === 3 || i === 1 || i === 4),
+        focusPair: (i === 0 || i === 3),
+        count: 12
+      };
+    },
+    count: 12
+  },
+
+  headon: {
+    durationSec: 480,
+    leftTitle: "左侧：纯 Hold 规则基线（不避让）",
+    rightTitle: "右侧：Geo-ADMM-RL（提前 60s 双向 3D 垂直分层）",
+    leftSummary: "2/6 到达 · 4 架迎头相撞",
+    rightSummary: "6/6 到达 · 零碰撞（关投影同样 100%）",
+    jumps: [
+      { label: "同层相向切入 (00:50)", t: 0.10 },
+      { label: "双向 3D 爬升/下降分层 (03:00)", t: 0.38 },
+      { label: "中心立体上下交汇 (04:30)", t: 0.52 },
+      { label: "回原层抵达终点 (07:40)", t: 0.95 }
+    ],
+    story: "<strong>3D 对照看点：</strong>点击<strong>「📐 侧视高度剖面」</strong>效果最震撼！右侧两架迎头相向的飞机（<strong>H3 与 H4</strong>、<strong>H1 与 H2</strong>）在距离 40+ km 时提前通过 <strong>24 步（144s）多步回报</strong> 预判风险，一架主动爬升 <strong>+310 ft</strong>、另一架同步下降 <strong>-310 ft</strong>，在中心形成漂亮的 <strong>上下立体拱桥交汇（总高差 > 600 ft）</strong>，通过后再平滑回到巡航高度；左侧则在同一高度层迎头相撞！",
+    getAircraftAt(t, isProtected, i) {
+      const pairIdx = Math.floor(i / 2);
+      const isSecond = (i % 2 === 1);
+      const ys = [-56, 0, 56];
+      const baseAlts = [20400, 20050, 20700];
+      const y = ys[pairIdx];
+      const baseAltFt = baseAlts[pairIdx];
+      const sx = isSecond ? 110 : -110;
+      const ex = isSecond ? -110 : 110;
+
+      const delay = (pairIdx === 2 && isSecond) ? 0.24 : 0.0;
+      const p = Math.max(0, Math.min(1, (t - delay) * 1.06));
+      let altFt = baseAltFt;
+
+      if (isProtected && pairIdx < 2) {
+        const arch = smoothstep(0.18, 0.44, t) * (1 - 0.65 * smoothstep(0.66, 0.92, t));
+        altFt = baseAltFt + (isSecond ? -310 : 310) * arch;
+      }
+
+      const hit = (!isProtected && pairIdx < 2 && t >= 0.47);
+      const wx = hit ? (isSecond ? 5 : -5) : lerp(sx, ex, p);
+      return {
+        id: `H${i + 1}`,
+        wx, wy: y, altFt, baseAltFt,
+        sx, sy: y, ex, ey: y,
+        status: hit ? "COLLISION" : (p >= 0.99 ? "GOAL" : "FLY"),
+        highlight: pairIdx < 2,
+        focusPair: pairIdx === 1,
+        count: 6
+      };
+    },
+    count: 6
+  },
+
+  yaw: {
+    durationSec: 450,
+    leftTitle: "左侧：旧一刀切保护（清零航向 → 越界）",
+    rightTitle: "右侧：逐机局部保护 + 镜像训练（3D 自主回航）",
+    leftSummary: "0/4 到达 · 4 架越界 (EXIT)",
+    rightSummary: "4/4 到达 · 零碰撞 · 零越界",
+    jumps: [
+      { label: "-15° 偏航起飞 (00:30)", t: 0.06 },
+      { label: "主动转向弧线回航 (02:15)", t: 0.30 },
+      { label: "左侧冲出 20km 红墙 (04:00)", t: 0.55 },
+      { label: "右侧稳稳抵达终点 (07:00)", t: 0.94 }
+    ],
+    story: "<strong>3D 对照看点：</strong>两组飞机分别在 <strong>FL200（20,000 ft）</strong> 和 <strong>FL206（20,600 ft）</strong> 两个立体高度层起飞，被人为施加 <strong>-15° 初始偏航且关闭 LNAV</strong>。左侧旧安全层把首步航向清零，飞机直冲 20 km 红色边界墙全部 <code>EXIT</code>；右侧启用<strong>逐机局部航向保护 + STE + 左右镜像增强</strong>后，孤立飞机保持自身高度层平稳划出 3D 回航弧线切回航路中心！",
+    getAircraftAt(t, isProtected, i) {
+      const laneIdx = Math.floor(i / 2);
+      const wave = i % 2;
+      const cy = laneIdx === 0 ? -42 : 42;
+      const baseAltFt = laneIdx === 0 ? 20000 : 20600;
+      const delay = wave * 0.16;
+      const u = Math.max(0, Math.min(1, (t - delay) * 1.18));
+      const sx = -108, ex = 108;
+      let wx, wy, status = "FLY";
+
+      if (!isProtected) {
+        const dx = u * 216;
+        const dy = -dx * Math.tan(15 * Math.PI / 180);
+        const hitExit = dy <= -28;
+        const clampDx = hitExit ? 28 / Math.tan(15 * Math.PI / 180) : dx;
+        wx = sx + clampDx;
+        wy = cy - clampDx * Math.tan(15 * Math.PI / 180);
+        if (hitExit) status = "EXIT";
+      } else {
+        wx = sx + u * 216;
+        wy = cy - 26 * Math.sin(Math.min(1, u * 2.1) * Math.PI) * Math.exp(-2.2 * u);
+        if (u >= 0.99) status = "GOAL";
+      }
+
+      return {
+        id: `Y${i + 1}`,
+        wx, wy, altFt: baseAltFt, baseAltFt,
+        sx, sy: cy, ex, ey: cy,
+        status,
+        highlight: true,
+        focusPair: false,
+        isYawScene: true,
+        corridorY: cy,
+        count: 4
+      };
+    },
+    count: 4
+  }
+};
+
+function draw3DAirspaceBox(ctx, W, H, sceneKey) {
+  const B = 112;
+  const z0 = 0;
+  const zTop = altToZ(20900);
+
+  // 1. Ground floor grid at Z_FLOOR_FT (19,500 ft)
+  ctx.strokeStyle = "rgba(35, 56, 96, 0.36)";
+  ctx.lineWidth = 1;
+  for (let g = -B; g <= B; g += 56) {
+    const a1 = project3D(g, -B, z0, W, H), a2 = project3D(g, B, z0, W, H);
+    ctx.beginPath(); ctx.moveTo(a1.sx, a1.sy); ctx.lineTo(a2.sx, a2.sy); ctx.stroke();
+    const b1 = project3D(-B, g, z0, W, H), b2 = project3D(B, g, z0, W, H);
+    ctx.beginPath(); ctx.moveTo(b1.sx, b1.sy); ctx.lineTo(b2.sx, b2.sy); ctx.stroke();
+  }
+
+  // 2. Vertical 3D bounding pillars + Altitude ticks (20,000 / 20,300 / 20,600 ft)
+  const corners = [[-B, -B], [B, -B], [B, B], [-B, B]];
+  ctx.strokeStyle = "rgba(56, 189, 248, 0.22)";
+  ctx.lineWidth = 1;
+  corners.forEach(([cx, cy]) => {
+    const bot = project3D(cx, cy, z0, W, H);
+    const top = project3D(cx, cy, zTop, W, H);
+    ctx.beginPath(); ctx.moveTo(bot.sx, bot.sy); ctx.lineTo(top.sx, top.sy); ctx.stroke();
+  });
+
+  // Altitude reference horizontal wireframe planes for FL200, FL203, FL206
+  [20000, 20300, 20600].forEach(fl => {
+    const zf = altToZ(fl);
+    ctx.save();
+    ctx.setLineDash([3, 5]);
+    ctx.strokeStyle = fl === 20000 ? "rgba(56, 189, 248, 0.26)" : "rgba(167, 139, 250, 0.18)";
+    ctx.beginPath();
+    corners.forEach(([cx, cy], idx) => {
+      const p = project3D(cx, cy, zf, W, H);
+      if (idx === 0) ctx.moveTo(p.sx, p.sy); else ctx.lineTo(p.sx, p.sy);
+    });
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+
+    // Label altitude scale on back-left pillar
+    const lbl = project3D(-B, -B, zf, W, H);
+    ctx.fillStyle = "rgba(147, 167, 200, 0.78)";
+    ctx.font = "10px ui-monospace, monospace";
+    ctx.fillText(`${fl}ft`, lbl.sx - 44, lbl.sy + 3);
+  });
+
+  // For yaw scene, draw translucent red 20km corridor boundary lines at both altitudes
+  if (sceneKey === "yaw") {
+    [-42, 42].forEach((cy, idx) => {
+      const zc = altToZ(idx === 0 ? 20000 : 20600);
+      [-28, 28].forEach(off => {
+        const p1 = project3D(-108, cy + off, zc, W, H);
+        const p2 = project3D(108, cy + off, zc, W, H);
+        ctx.save();
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = "rgba(251, 113, 133, 0.45)";
+        ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.moveTo(p1.sx, p1.sy); ctx.lineTo(p2.sx, p2.sy); ctx.stroke();
+        ctx.restore();
+      });
+    });
+  }
+}
+
+function draw3DCylinder(ctx, wx, wy, altFt, radiusWorld, halfHeightFt, W, H, strokeColor, fillColor) {
+  const segs = 20;
+  const zTop = altToZ(altFt + halfHeightFt);
+  const zBot = altToZ(altFt - halfHeightFt);
+  const topPts = [], botPts = [];
+  for (let s = 0; s <= segs; s++) {
+    const a = (s / segs) * Math.PI * 2;
+    const px = wx + radiusWorld * Math.cos(a);
+    const py = wy + radiusWorld * Math.sin(a);
+    topPts.push(project3D(px, py, zTop, W, H));
+    botPts.push(project3D(px, py, zBot, W, H));
+  }
+  // Fill subtle cylinder shell
+  ctx.fillStyle = fillColor;
+  ctx.beginPath();
+  topPts.forEach((p, idx) => idx === 0 ? ctx.moveTo(p.sx, p.sy) : ctx.lineTo(p.sx, p.sy));
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.beginPath();
+  botPts.forEach((p, idx) => idx === 0 ? ctx.moveTo(p.sx, p.sy) : ctx.lineTo(p.sx, p.sy));
+  ctx.closePath();
+  ctx.fill();
+
+  // Stroke top & bottom ellipses + 4 vertical ribs
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  topPts.forEach((p, idx) => idx === 0 ? ctx.moveTo(p.sx, p.sy) : ctx.lineTo(p.sx, p.sy));
+  ctx.stroke();
+
+  ctx.beginPath();
+  botPts.forEach((p, idx) => idx === 0 ? ctx.moveTo(p.sx, p.sy) : ctx.lineTo(p.sx, p.sy));
+  ctx.stroke();
+
+  for (let k = 0; k < 4; k++) {
+    const idx = k * 5;
+    ctx.beginPath();
+    ctx.moveTo(topPts[idx].sx, topPts[idx].sy);
+    ctx.lineTo(botPts[idx].sx, botPts[idx].sy);
+    ctx.stroke();
+  }
+}
+
+function drawPane3D(ctx, sc, t, isProtected, sceneKey) {
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  draw3DAirspaceBox(ctx, W, H, sceneKey);
+
+  // Sample all aircraft + their 3D historical trails
+  const aircraft = [];
+  for (let i = 0; i < sc.count; i++) {
+    const ac = sc.getAircraftAt(t, isProtected, i);
+    const trail = [];
+    const steps = 18;
+    const tStart = Math.max(0, t - 0.36);
+    for (let s = 0; s <= steps; s++) {
+      const ts = lerp(tStart, t, s / steps);
+      const pt = sc.getAircraftAt(ts, isProtected, i);
+      trail.push(project3D(pt.wx, pt.wy, altToZ(pt.altFt), W, H));
+    }
+    const pos3d = project3D(ac.wx, ac.wy, altToZ(ac.altFt), W, H);
+    const shadow3d = project3D(ac.wx, ac.wy, 0, W, H);
+    // Forward direction in 2D screen space for arrow heading
+    const acNext = sc.getAircraftAt(Math.min(1, t + 0.015), isProtected, i);
+    const posNext = project3D(acNext.wx, acNext.wy, altToZ(acNext.altFt), W, H);
+    const screenHdg = Math.atan2(posNext.sy - pos3d.sy, posNext.sx - pos3d.sx);
+    aircraft.push({ ...ac, trail, pos3d, shadow3d, screenHdg });
+  }
+
+  // Draw nominal reference routes on their base altitude plane
+  aircraft.forEach(ac => {
+    const p1 = project3D(ac.sx, ac.sy, altToZ(ac.baseAltFt), W, H);
+    const p2 = project3D(ac.ex, ac.ey, altToZ(ac.baseAltFt), W, H);
+    ctx.save();
+    ctx.setLineDash([4, 5]);
+    ctx.strokeStyle = "rgba(56, 189, 248, 0.16)";
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(p1.sx, p1.sy); ctx.lineTo(p2.sx, p2.sy); ctx.stroke();
+    ctx.restore();
+  });
+
+  // Focus pair 3D telemetry
+  const focus = aircraft.filter(a => a.focusPair);
+  let focusHorizKm = 99, focusVertFt = 0;
+  if (focus.length === 2) {
+    const [a, b] = focus;
+    focusHorizKm = Math.hypot(a.wx - b.wx, a.wy - b.wy) * 0.45;
+    focusVertFt = Math.abs(a.altFt - b.altFt);
+    const danger = (focusHorizKm < 6 && focusVertFt < 300);
+    ctx.save();
+    ctx.setLineDash([3, 3]);
+    ctx.strokeStyle = danger ? "#fb7185" : (focusVertFt >= 300 ? "#34d399" : "#fbbf24");
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(a.pos3d.sx, a.pos3d.sy);
+    ctx.lineTo(b.pos3d.sx, b.pos3d.sy);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Depth sort aircraft (painter's algorithm: far -> near)
+  const sorted = [...aircraft].sort((a, b) => b.pos3d.depth - a.pos3d.depth);
+
+  let nGoal = 0, nCol = 0, nExit = 0;
+  sorted.forEach(ac => {
+    if (ac.status === "GOAL") nGoal++;
+    if (ac.status === "COLLISION") nCol++;
+    if (ac.status === "EXIT") nExit++;
+
+    const deltaAlt = ac.altFt - ac.baseAltFt;
+    const isClimbing = deltaAlt > 25;
+    const isDescending = deltaAlt < -25;
+
+    const color =
+      ac.status === "COLLISION" ? "#fb7185" :
+      ac.status === "EXIT" ? "#f97316" :
+      ac.status === "GOAL" ? "#34d399" :
+      isClimbing ? "#34d399" :
+      isDescending ? "#a78bfa" :
+      ac.focusPair ? "#fbbf24" : "#38bdf8";
+
+    // 1. Ground shadow dot + vertical drop-line (key 3D height cue!)
+    ctx.fillStyle = "rgba(148, 163, 184, 0.28)";
+    ctx.beginPath();
+    ctx.ellipse(ac.shadow3d.sx, ac.shadow3d.sy, 4.5, 2.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.save();
+    ctx.setLineDash([2, 3]);
+    ctx.strokeStyle = (isClimbing || isDescending || ac.focusPair)
+      ? (isClimbing ? "rgba(52,211,153,0.65)" : isDescending ? "rgba(167,139,250,0.65)" : "rgba(251,191,36,0.45)")
+      : "rgba(148,163,184,0.22)";
+    ctx.lineWidth = (isClimbing || isDescending) ? 1.6 : 1;
+    ctx.beginPath();
+    ctx.moveTo(ac.shadow3d.sx, ac.shadow3d.sy);
+    ctx.lineTo(ac.pos3d.sx, ac.pos3d.sy);
+    ctx.stroke();
+    ctx.restore();
+
+    // 2. 3D Historical Curved Flight Trail
+    if (ac.trail.length > 1) {
+      ctx.strokeStyle = ac.status === "COLLISION" ? "rgba(251,113,133,0.75)" :
+                        isClimbing ? "rgba(52,211,153,0.85)" :
+                        isDescending ? "rgba(167,139,250,0.85)" :
+                        ac.focusPair ? "rgba(251,191,36,0.7)" : "rgba(56,189,248,0.4)";
+      ctx.lineWidth = (ac.focusPair || isClimbing || isDescending || sceneKey === "yaw") ? 2.4 : 1.3;
+      ctx.beginPath();
+      ac.trail.forEach((p, idx) => idx === 0 ? ctx.moveTo(p.sx, p.sy) : ctx.lineTo(p.sx, p.sy));
+      ctx.stroke();
+    }
+
+    // 3. 3D Cylindrical Protection Zone for focus pair & colliding aircraft (5km radius, ±150ft half-height)
+    if (ac.focusPair || ac.status === "COLLISION") {
+      const cylStroke = ac.status === "COLLISION" ? "rgba(251,113,133,0.9)" :
+                        isClimbing ? "rgba(52,211,153,0.65)" :
+                        isDescending ? "rgba(167,139,250,0.65)" : "rgba(251,191,36,0.55)";
+      const cylFill = ac.status === "COLLISION" ? "rgba(251,113,133,0.22)" :
+                      isClimbing ? "rgba(52,211,153,0.12)" :
+                      isDescending ? "rgba(167,139,250,0.12)" : "rgba(251,191,36,0.08)";
+      draw3DCylinder(ctx, ac.wx, ac.wy, ac.altFt, 11.5, 150, W, H, cylStroke, cylFill);
+    }
+
+    // 4. 3D Aircraft Marker
+    const sz = Math.max(5.5, 7.5 * ac.pos3d.scale / 1.45);
+    ctx.save();
+    ctx.translate(ac.pos3d.sx, ac.pos3d.sy);
+    ctx.rotate(ac.screenHdg);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(sz * 1.25, 0);
+    ctx.lineTo(-sz * 0.85, -sz * 0.65);
+    ctx.lineTo(-sz * 0.45, 0);
+    ctx.lineTo(-sz * 0.85, sz * 0.65);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    // 5. Crisp Altitude & Vertical Maneuver Tag
+    if (ac.focusPair || ac.status === "COLLISION" || ac.status === "EXIT" || isClimbing || isDescending || sceneKey !== "crossing6") {
+      ctx.fillStyle = color;
+      ctx.font = "bold 10.5px ui-monospace, monospace";
+      const arrow = isClimbing ? ` ▲+${Math.round(deltaAlt)}ft` : (isDescending ? ` ▼${Math.round(deltaAlt)}ft` : "");
+      ctx.fillText(`${ac.id} ${Math.round(ac.altFt)}ft${arrow}`, ac.pos3d.sx + 10, ac.pos3d.sy - 6);
+    }
+    if (ac.status === "COLLISION") {
+      ctx.fillStyle = "#fb7185";
+      ctx.font = "bold 11px sans-serif";
+      ctx.fillText("💥 COLLISION", ac.pos3d.sx - 34, ac.pos3d.sy + 22);
+    } else if (ac.status === "EXIT") {
+      ctx.fillStyle = "#f97316";
+      ctx.font = "bold 11px sans-serif";
+      ctx.fillText("⚠ EXIT", ac.pos3d.sx - 18, ac.pos3d.sy - 14);
+    }
+  });
+
+  // Bottom Vertical Separation Telemetry Strip
+  ctx.fillStyle = "#0a1428";
+  ctx.fillRect(0, H - 54, W, 54);
+  ctx.strokeStyle = "#1e3154";
+  ctx.beginPath(); ctx.moveTo(0, H - 54); ctx.lineTo(W, H - 54); ctx.stroke();
+
+  if (focus.length === 2) {
+    const safeV = focusVertFt >= 300;
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "11.5px sans-serif";
+    ctx.fillText(`重点对 (${focus[0].id} ↔ ${focus[1].id})：`, 14, H - 32);
+    ctx.fillStyle = focusHorizKm < 5 ? "#fb7185" : "#e2e8f0";
+    ctx.font = "bold 12px ui-monospace, monospace";
+    ctx.fillText(`水平 ${focusHorizKm.toFixed(1)} km`, 165, H - 32);
+    ctx.fillStyle = safeV ? "#34d399" : (focusHorizKm < 8 ? "#fb7185" : "#fbbf24");
+    ctx.fillText(`垂直高差 ${Math.round(focusVertFt)} ft ${safeV ? "✓ (>300ft 安全分层)" : "(<300ft 同层危险)"}`, 275, H - 32);
+
+    const barW = W - 28;
+    ctx.fillStyle = "#111d36";
+    ctx.fillRect(14, H - 18, barW, 8);
+    const fillRatio = Math.min(1, focusVertFt / 650);
+    ctx.fillStyle = safeV ? "#34d399" : "#fb7185";
+    ctx.fillRect(14, H - 18, barW * fillRatio, 8);
+    const thrX = 14 + barW * (300 / 650);
+    ctx.strokeStyle = "#fbbf24"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(thrX, H - 21); ctx.lineTo(thrX, H - 7); ctx.stroke();
+  } else {
+    ctx.fillStyle = isProtected ? "#34d399" : "#fb7185";
+    ctx.font = "12px sans-serif";
+    ctx.fillText(
+      isProtected ? "双高度层 (FL200/FL206) 逐机放行偏航转向：平稳切回中心航路 ✓" : "旧版规则清零首步航向：飞机持续 -15° 偏航冲出 20 km 红墙 ✗",
+      14, H - 22
+    );
+  }
+
+  return { nGoal, nCol, nExit, total: aircraft.length };
+}
+
+function setCamera(yaw, pitch, activeBtnId) {
+  camYawDeg = yaw;
+  camPitchDeg = pitch;
+  document.getElementById("camAngles").textContent = `Yaw ${Math.round(camYawDeg)}° · Pitch ${Math.round(camPitchDeg)}°`;
+  ["view3d", "viewSide", "viewTop"].forEach(id => {
+    document.getElementById(id).classList.toggle("active", id === activeBtnId);
+  });
+  renderFrame();
+}
+
+// Mouse/Pointer drag to rotate 3D view on either canvas
+[cLeft, cRight].forEach(cv => {
+  cv.addEventListener("pointerdown", e => {
+    dragging = true;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    cv.setPointerCapture(e.pointerId);
+    ["view3d", "viewSide", "viewTop"].forEach(id => document.getElementById(id).classList.remove("active"));
+  });
+  cv.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    const dx = e.clientX - dragStartX;
+    const dy = e.clientY - dragStartY;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    camYawDeg = ((camYawDeg + dx * 0.55 + 180) % 360 + 360) % 360 - 180;
+    camPitchDeg = Math.max(4, Math.min(89, camPitchDeg + dy * 0.45));
+    document.getElementById("camAngles").textContent = `Yaw ${Math.round(camYawDeg)}° · Pitch ${Math.round(camPitchDeg)}°`;
+    renderFrame();
+  });
+  cv.addEventListener("pointerup", () => { dragging = false; });
+  cv.addEventListener("pointercancel", () => { dragging = false; });
+});
+
+document.getElementById("view3d").addEventListener("click", () => setCamera(-32, 26, "view3d"));
+document.getElementById("viewSide").addEventListener("click", () => setCamera(0, 7, "viewSide"));
+document.getElementById("viewTop").addEventListener("click", () => setCamera(0, 89, "viewTop"));
+
+function updateSceneUI() {
+  const sc = SCENES[currentScene];
+  document.getElementById("leftTitle").textContent = sc.leftTitle;
+  document.getElementById("rightTitle").textContent = sc.rightTitle;
+  document.getElementById("leftBadge").textContent = sc.leftSummary;
+  document.getElementById("rightBadge").textContent = sc.rightSummary;
+  document.getElementById("simStory").innerHTML = sc.story;
+
+  const jumpBar = document.getElementById("jumpBar");
+  jumpBar.innerHTML = `<span style="font-size:12.5px; color:var(--muted);">关键帧跳转：</span>` +
+    sc.jumps.map(j => `<button class="btn warn" data-jump="${j.t}">${j.label}</button>`).join("");
+  jumpBar.querySelectorAll("button").forEach(b => {
+    b.addEventListener("click", () => {
+      simT = parseFloat(b.dataset.jump);
+      document.getElementById("timeSlider").value = Math.round(simT * 1000);
+      renderFrame();
+    });
+  });
+}
+
+function renderFrame() {
+  const sc = SCENES[currentScene];
+  const statL = drawPane3D(ctxL, sc, simT, false, currentScene);
+  const statR = drawPane3D(ctxR, sc, simT, true, currentScene);
+
+  document.getElementById("leftFoot").innerHTML =
+    `<span>到达: <strong>${statL.nGoal}/${statL.total}</strong></span>` +
+    `<span class="c-rose">碰撞: <strong>${statL.nCol}</strong></span>` +
+    `<span class="c-amber">越界: <strong>${statL.nExit}</strong></span>`;
+  document.getElementById("rightFoot").innerHTML =
+    `<span class="c-emerald">到达: <strong>${statR.nGoal}/${statR.total}</strong></span>` +
+    `<span>碰撞: <strong>${statR.nCol}</strong></span>` +
+    `<span>越界: <strong>${statR.nExit}</strong></span>`;
+
+  const sec = Math.floor(simT * sc.durationSec);
+  const mm = String(Math.floor(sec / 60)).padStart(2, "0");
+  const ss = String(sec % 60).padStart(2, "0");
+  document.getElementById("timeLabel").textContent = `t = ${mm}:${ss}`;
+}
+
+function loop(now) {
+  const dt = (now - lastFrame) / 1000;
+  lastFrame = now;
+  if (playing) {
+    simT += dt * 0.085 * speedMult;
+    if (simT > 1.0) simT = 0.0;
+    document.getElementById("timeSlider").value = Math.round(simT * 1000);
+  }
+  renderFrame();
+  requestAnimationFrame(loop);
+}
+
+document.querySelectorAll("#simTabs button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("#simTabs button").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    currentScene = btn.dataset.scene;
+    simT = 0.0;
+    playing = true;
+    document.getElementById("btnPlay").textContent = "⏸ 暂停";
+    updateSceneUI();
+    renderFrame();
+  });
+});
+
+document.getElementById("btnPlay").addEventListener("click", () => {
+  playing = !playing;
+  document.getElementById("btnPlay").textContent = playing ? "⏸ 暂停" : "▶ 播放";
+});
+document.getElementById("btnReset").addEventListener("click", () => {
+  simT = 0.0;
+  document.getElementById("timeSlider").value = 0;
+  renderFrame();
+});
+document.getElementById("btnSpeed").addEventListener("click", () => {
+  const speeds = [0.5, 1.0, 2.0];
+  speedMult = speeds[(speeds.indexOf(speedMult) + 1) % speeds.length];
+  document.getElementById("btnSpeed").textContent = `速度: ${speedMult.toFixed(1)}x`;
+});
+document.getElementById("timeSlider").addEventListener("input", e => {
+  simT = parseInt(e.target.value, 10) / 1000;
+  renderFrame();
+});
+
+updateSceneUI();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
