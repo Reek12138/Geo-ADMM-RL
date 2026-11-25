@@ -234,10 +234,11 @@ def _disturbance_effects(row):
         _require(not wind["profiles"] and wind["max_mps"] == 0., f"Unexpected wind for seed {seed}")
 
 
-def audit(trial):
+def audit(trial, *, inherited_trial=None):
     trial = trial.resolve()
-    acceptance = trial / "acceptance.json"
-    inputs = (trial / "inputs.txt").read_text().splitlines()
+    base = inherited_trial.resolve() if inherited_trial is not None else trial
+    acceptance = base / "acceptance.json"
+    inputs = (base / "inputs.txt").read_text().splitlines()
     checkpoint = Path(inputs[0])
     digest = paper_checkpoint_digest(acceptance, checkpoint)
     acceptance_digest = _checksum(acceptance)
@@ -254,7 +255,8 @@ def audit(trial):
 
     def read(path, expected_sha=None):
         path = Path(path).resolve()
-        key = str(path.relative_to(trial))
+        root = trial if path.is_relative_to(trial) else base
+        key = str(path.relative_to(root))
         for attempt in range(4):
             try:
                 raw = path.read_bytes()
@@ -293,7 +295,7 @@ def audit(trial):
         return report
 
     results = {}
-    figures = trial / "exp1/summary.json"
+    figures = base / "exp1/summary.json"
     if figures.is_file():
         figure = read(figures)
         _require(figure["geo_checkpoint_sha256"] == digest and figure["stage2_acceptance_sha256"] == acceptance_digest
@@ -308,9 +310,9 @@ def audit(trial):
                 communication = row.get("communication", {})
                 _require(MPC_COMMUNICATION.items() <= communication.items() and communication.get("gap_ticks", 0) > 0,
                          f"Wrong Geo MPC profile in {label}")
-            _require(read(trial / "exp1" / f"{label}.json") == row, f"Figure 4 replay differs from its summary: {label}")
+            _require(read(base / "exp1" / f"{label}.json") == row, f"Figure 4 replay differs from its summary: {label}")
 
-    generalization = trial / "exp2-3/summary.json"
+    generalization = base / "exp2-3/summary.json"
     if generalization.is_file():
         combined = read(generalization)
         _require((combined["checkpoint_sha256"], combined["acceptance_sha256"]) == (digest, acceptance_digest),
@@ -334,7 +336,7 @@ def audit(trial):
                                      f"Wrong held topology for {family}")
             results[key] = combined["panels"][key]
 
-    disturbances = trial / "exp4/summary.json"
+    disturbances = base / "exp4/summary.json"
     if disturbances.is_file():
         report = read(disturbances)
         _require((report["checkpoint_sha256"], report["acceptance_sha256"]) == (digest, acceptance_digest),
@@ -380,7 +382,7 @@ def audit(trial):
         results["exp4"] = {"disturbance_replays": sum(len(x) for x in report["disturbance_rows"].values()),
                            "disturbance_outcomes": condition_outcomes}
 
-    communication = trial / "exp5/summary.json"
+    communication = base / "exp5/summary.json"
     manifest = read(communication) if communication.is_file() else None
     if manifest:
         _require((manifest["checkpoint_sha256"], manifest["acceptance_sha256"]) == (digest, acceptance_digest)
@@ -390,7 +392,7 @@ def audit(trial):
     fields = ("admm_k", "cold_start", "communication_period", "packet_loss", "delay_steps", "schedule")
     for panel, conditions in EXP5_CONFIGURATIONS.items():
         ref = manifest["panels"][panel] if manifest else None
-        path = Path(ref["output"]) if ref else trial / "exp5" / panel / "summary.json"
+        path = Path(ref["output"]) if ref else base / "exp5" / panel / "summary.json"
         communication_progress[panel] = 0
         if not path.is_file() and ref is None:
             continue
@@ -474,7 +476,7 @@ def audit(trial):
         report = read(ablations)
         _require((report["checkpoint_sha256"], report["acceptance_sha256"]) == (digest, acceptance_digest),
                  "Unexpected Exp 6 provenance")
-        one_step = trial / "one-step"
+        one_step = base / "one-step"
         control_config = one_step / "reference-config.json" if deployed_mpc else Path(inputs[2])
         matched = _verify_one_step_control(argparse.Namespace(
             checkpoint=checkpoint, control_config=control_config,
@@ -540,5 +542,6 @@ def audit(trial):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("trial", type=Path)
+    parser.add_argument("--inherited-trial", type=Path, help="Read the frozen Exp 1–5 and one-step artifacts from this run")
     args = parser.parse_args()
-    print(json.dumps(audit(args.trial), indent=2, allow_nan=False))
+    print(json.dumps(audit(args.trial, inherited_trial=args.inherited_trial), indent=2, allow_nan=False))

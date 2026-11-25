@@ -1,9 +1,11 @@
 """Decentralized gap-tick MPC using passive ADS-B tracks and accelerated vertical kinematics."""
 
+from math import radians
+
 import torch
 
 from core.conflict_graph import _ball_interval
-from envs.bluesky_graph import SCALE
+from envs.bluesky_graph import CROSS_TRACK_NODE_FEATURE, SCALE
 from envs.bluesky_safety import PhysicalState, _active_pairs, _forecast_command
 from envs.observations import LAYER
 
@@ -84,7 +86,19 @@ def _predicted_clearance(own, own_vs, other, other_vs, active, *, margin=0.0):
     return raw_shortfall > 1e-4, buf_shortfall > 1e-4, buf_shortfall
 
 
-def plan_gap_maneuver(physical, active, proposal, *, margin=6.0):
+def corridor_recovery_heading(nodes, previous_cross_track, control_dt):
+    """Turn toward the destination when local track predicts a corridor exit."""
+    current = nodes[..., CROSS_TRACK_NODE_FEATURE].abs()
+    if previous_cross_track is None:
+        return torch.zeros_like(current)
+    outward = (current - previous_cross_track.abs()) / control_dt
+    projected = current + SCALE.horizon * outward.clamp_min(0.0)
+    error = torch.atan2(nodes[..., 5], nodes[..., 6])
+    recover = (nodes[..., 8] <= 0.5) & (outward > 0.0) & (projected >= 1.0) & (error.abs() > radians(2.0))
+    return (error / radians(5.0)).clamp(-1.0, 1.0).masked_fill(~recover, 0.0)
+
+
+def plan_gap_maneuver(physical, active, proposal, *, margin=6.0, route_heading=None):
     """Choose a decentralized gap-tick action from passive ADS-B tracks alone.
 
     Each aircraft relies exclusively on locally sensed tracks (no inter-aircraft
@@ -94,20 +108,19 @@ def plan_gap_maneuver(physical, active, proposal, *, margin=6.0):
       - Breaks vertical symmetry deterministically from relative altitude (tie-
         broken by slot index) and verifies every candidate against both nominal
         neighbors and neighbors executing their deterministic vertical sense.
-      - Preserves safe conflict-free heading-recovery proposals so off-route
-        aircraft do not drift past the lateral corridor during long comm gaps.
+      - Evaluates bounded heading candidates when speed or altitude cannot clear a conflict.
+      - Preserves safe heading-recovery proposals for conflict-free aircraft
+        and can use the aircraft's own route when the proposal is within the heading deadband.
     """
     batch, aircraft, _ = proposal.shape
     device, dtype = proposal.device, proposal.dtype
-    axes = torch.tensor(
-        [[1.0, 0.0, 0.0], [-1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, -1.0, 0.0]],
-        dtype=dtype, device=device,
-    )
+    axes = proposal.new_tensor([
+        [1.0, 0.0, 0.0], [-1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0], [0.0, -1.0, 0.0],
+        [0.0, 0.0, 1.0], [0.0, 0.0, -1.0],
+    ])
     moves = axes[None, :, None, :].expand(batch, -1, aircraft, -1)
     hold = torch.zeros_like(proposal)
-    candidates = torch.cat((hold.unsqueeze(1), proposal.unsqueeze(1), moves), dim=1)
-    candidates = candidates.masked_fill(~active[:, None, :, None], 0.0)
-
     state = PhysicalState(*(value.unsqueeze(1) for value in physical))
     nominal = _forecast_command(state, hold.unsqueeze(1), dense=False)
     true_vs = state.vertical_speed
@@ -115,6 +128,12 @@ def plan_gap_maneuver(physical, active, proposal, *, margin=6.0):
     baseline_raw, baseline_buf, _ = _predicted_clearance(nominal, true_vs, nominal, true_vs, active, margin=margin)
     nominal_conflict = baseline_buf.squeeze(1)
     in_conflict = nominal_conflict.any(dim=-1)
+    if route_heading is not None:
+        recover = ~in_conflict & (proposal[..., 2].abs() <= 0.05) & (route_heading.abs() > 0.05)
+        turn = torch.stack((hold[..., 0], hold[..., 1], route_heading.to(dtype)), dim=-1)
+        proposal = torch.where(recover.unsqueeze(-1), turn, proposal)
+    candidates = torch.cat((hold.unsqueeze(1), proposal.unsqueeze(1), moves), dim=1)
+    candidates = candidates.masked_fill(~active[:, None, :, None], 0.0)
 
     # Deterministic ADS-B vertical sense (higher climbs, lower descends; slot tie-break).
     altitude = physical[0][..., 2]

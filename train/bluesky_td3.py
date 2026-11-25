@@ -14,11 +14,12 @@ from time import perf_counter, sleep
 import torch
 
 from envs.bluesky_graph import (
-    FAR_CONFLICT_FEATURES, SELECTED_ALTITUDE_EDGE_FEATURES, SELECTED_ALTITUDE_NODE_FEATURE, ObservationProfile,
+    CROSS_TRACK_NODE_FEATURE, FAR_CONFLICT_FEATURES, SELECTED_ALTITUDE_EDGE_FEATURES,
+    SELECTED_ALTITUDE_NODE_FEATURE, ObservationProfile,
 )
 from envs.bluesky_safety import lookahead_risk, protected_command
 from envs.bluesky_traffic import FAMILIES, MIXTURE_NAMES
-from eval.admm_gap_mpc import plan_gap_maneuver
+from eval.admm_gap_mpc import corridor_recovery_heading, plan_gap_maneuver
 from train.td3 import (
     REPLAY_EVENTS, CollisionHorizon, CrossingExploration, DeviceReplay, MultiStepReturns, Rollout, TD3, encode_executed_action,
     load_teacher_data, mirror_replay_batch,
@@ -154,6 +155,10 @@ def _reset_far_conflict_weights(network, optimizer=None):
     _reset_columns(network.encoder.embed_nodes.weight, FAR_CONFLICT_FEATURES, optimizer)
 
 
+def _initialize_cross_track_weights(network, optimizer=None):
+    _reset_columns(network.encoder.embed_nodes.weight, CROSS_TRACK_NODE_FEATURE, optimizer)
+
+
 @torch.no_grad()
 def _initialize_selected_altitude_weights(network, optimizer=None, *, from_plan_b=False):
     nodes = network.encoder.embed_nodes.weight
@@ -287,6 +292,8 @@ def _run(args, device, learner, environment, monitor=None, resume=None):
     period = getattr(args, "admm_communication_period", None)
     gap_policy = getattr(args, "admm_gap_policy", "hold")
     interval = max(1, int(round(period / args.control_dt))) if period is not None else 1
+    use_corridor_recovery = args.cross_track_observation and args.admm_k and gap_policy == "mpc" and interval > 1
+    previous_cross_track = None
 
     for decision in range(start_decision + 1, args.decisions + 1):
         chunks = zip(*(tensor.split(args.inference_batch) for tensor in graph), strict=True)
@@ -308,7 +315,11 @@ def _run(args, device, learner, environment, monitor=None, resume=None):
             executed = torch.zeros_like(executed)
         elif args.admm_k and gap_policy == "mpc":
             margin = getattr(args, "batched_layer_margin", 0.0) or 6.0
-            executed, _, planned = plan_gap_maneuver(physical, graph[3], executed, margin=margin)
+            route_heading = (corridor_recovery_heading(graph[0], previous_cross_track, args.control_dt)
+                             if use_corridor_recovery else None)
+            executed, _, planned = plan_gap_maneuver(
+                physical, graph[3], executed, margin=margin, route_heading=route_heading,
+            )
             feasible = graph[3] & (planned == 0).unsqueeze(-1)
         if unprotected is not None:
             executed = torch.where(unprotected[:, None, None], action[..., 4:], executed)
@@ -352,6 +363,10 @@ def _run(args, device, learner, environment, monitor=None, resume=None):
             transition = return_window.append(transition)
         if transition is not None:
             replay.append(transition)
+        if use_corridor_recovery:
+            previous_cross_track = torch.where(done.unsqueeze(-1) | ~graph[-1],
+                                               future[0][..., CROSS_TRACK_NODE_FEATURE],
+                                               graph[0][..., CROSS_TRACK_NODE_FEATURE])
         graph = future
         explored += action.shape[0]
         zero = torch.zeros_like(done, dtype=torch.long)
@@ -636,6 +651,17 @@ def train(args, *, monitor=None):
                 _reset_far_conflict_weights(critic)
         if learner.anchor is not None and not ObservationProfile(**anchor.get("observation_profile", {})).far_conflict_observation:
             _reset_far_conflict_weights(learner.anchor)
+    if profile.cross_track_observation:
+        if source is not None and not previous.cross_track_observation:
+            _initialize_cross_track_weights(learner.actor, learner.actor_optimizer)
+            _initialize_cross_track_weights(learner.target_actor)
+            for critic in (learner.critic.first, learner.critic.second):
+                _initialize_cross_track_weights(critic, learner.critic_optimizer)
+            for critic in (learner.target_critic.first, learner.target_critic.second):
+                _initialize_cross_track_weights(critic)
+        if learner.anchor is not None and not ObservationProfile(
+                **anchor.get("observation_profile", {})).cross_track_observation:
+            _initialize_cross_track_weights(learner.anchor)
     if profile.selected_altitude_observation:
         if source is not None and not previous.selected_altitude_observation:
             from_plan_b = _training_plan(source, path) == "b"

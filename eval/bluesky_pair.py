@@ -13,12 +13,12 @@ from warnings import warn
 
 import torch
 
-from envs.bluesky_graph import ObservationProfile
+from envs.bluesky_graph import CROSS_TRACK_NODE_FEATURE, ObservationProfile
 from envs.bluesky_traffic import HELD_TOPOLOGIES
 from envs.bluesky_safety import protected_command
 from envs.bluesky_workers import NativeWorkers, SEPARATION_FIELDS, WorkerConfig
 from eval.admm_communication import PACKET_SEED_OFFSET, DelayedPairExchange, PairExchange
-from eval.admm_gap_mpc import plan_gap_maneuver
+from eval.admm_gap_mpc import corridor_recovery_heading, plan_gap_maneuver
 from eval.graph_statistics import GraphStatistics
 from models.graphformer import Actor
 from train.td3 import encode_action
@@ -90,6 +90,7 @@ def _measure_steps(actor, directory, args, device, family, iterations):
     delay = getattr(args, "admm_delay_steps", None)
     interval = _communication_interval(communication_period, args.control_dt)
     gap_policy = getattr(args, "admm_gap_policy", "hold")
+    use_mpc = bool(iterations) and gap_policy == "mpc" and interval > 1
     exchange = None
     if loss_rate is not None or communication_period is not None or delay is not None:
         exchange_args = (0.0 if loss_rate is None else loss_rate, args.seed, args.seeds, device)
@@ -102,7 +103,7 @@ def _measure_steps(actor, directory, args, device, family, iterations):
     cfg = WorkerConfig(1, args.aircraft, 0.05, args.control_dt, args.max_steps, args.seed, True, family,
                        not args.control_frame_diagnostics, detection_metres=profile.detection_metres,
                        geodesic_navigation=profile.geodesic_navigation,
-                       cross_track_observation=profile.cross_track_observation,
+                       cross_track_observation=profile.cross_track_observation or use_mpc,
                        far_conflict_observation=profile.far_conflict_observation,
                        selected_altitude_observation=profile.selected_altitude_observation,
                        navdata=getattr(args, "navdata", None),
@@ -123,13 +124,18 @@ def _measure_steps(actor, directory, args, device, family, iterations):
         decision_ms = []
         cycle_ms = []
         start = perf_counter()
+        previous_cross_track = None
         for step in range(args.max_steps):
             if isinstance(exchange, DelayedPairExchange):
                 exchange.begin_step(step, graph[-1], live)
             if device.type == "cuda":
                 torch.cuda.synchronize(device)
             decision_start = perf_counter()
-            output = actor(*graph)
+            nodes = graph[0]
+            if use_mpc and not profile.cross_track_observation:
+                nodes = nodes.clone()
+                nodes[..., CROSS_TRACK_NODE_FEATURE] = 0
+            output = actor(nodes, *graph[1:])
             action = encode_action(output)
             commands = action[..., 4:]
             scheduled = iterations and step % interval == 0
@@ -149,7 +155,10 @@ def _measure_steps(actor, directory, args, device, family, iterations):
                 # Zero increments leave the last advertised targets selected in BlueSky.
                 commands = torch.zeros_like(commands)
             elif iterations and gap_mpc is not None:
-                commands, before, after = plan_gap_maneuver(env.physical, graph[-1] & live.unsqueeze(-1), commands)
+                route_heading = corridor_recovery_heading(graph[0], previous_cross_track, args.control_dt)
+                commands, before, after = plan_gap_maneuver(
+                    env.physical, graph[-1] & live.unsqueeze(-1), commands, route_heading=route_heading,
+                )
                 adjusted = commands.abs().amax(dim=-1).gt(1e-5).sum(dim=-1)
                 observations = torch.stack((live.long(), adjusted, before, after), dim=-1)
                 gap_mpc.add_(observations)
@@ -166,6 +175,8 @@ def _measure_steps(actor, directory, args, device, family, iterations):
                         zip(graph[2].cpu().numpy(), graph[-1].cpu().numpy(), live.tolist(), strict=True)):
                     if running:
                         statistics[index].add(adjacency, active)
+            if use_mpc:
+                previous_cross_track = graph[0][..., CROSS_TRACK_NODE_FEATURE].clone()
             yield
             graph, reward, done, info = env.finish_step()
             if recovery_tick is not None:

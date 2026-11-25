@@ -14,6 +14,7 @@ METRES_PER_DEGREE = 1000.0 * EARTH_RADIUS_KM * RADIANS
 SCALE = ObservationScale(speed_min=145.0, speed_max=220.0, nominal_speed=183.0, horizon=120.0,
                          horizontal_radius=5000.0, detection=20000.0)
 ALTITUDE_REFERENCE = 20000.0 * 0.3048
+CROSS_TRACK_NODE_FEATURE = 9
 FAR_CONFLICT_FEATURES = slice(15, 21)
 SELECTED_ALTITUDE_NODE_FEATURE = 4
 SELECTED_ALTITUDE_EDGE_FEATURES = (13, 17)
@@ -128,7 +129,9 @@ def traffic_graph(*, latitude, longitude, altitude, heading, east, north, vertic
     node[..., 7] = goal_distance / (2_000.0 * airspace_half_km)
     node[..., 8] = lnav
     if route_origin is not None:
-        node[..., 9] = cross_track_km(latitude, longitude, goal_latitude, goal_longitude, *route_origin) / 20.0
+        node[..., CROSS_TRACK_NODE_FEATURE] = (
+            cross_track_km(latitude, longitude, goal_latitude, goal_longitude, *route_origin) / 20.0
+        )
     if far_conflict_observation:
         target = planned_altitude if selected_altitude is None else selected_altitude
         node[..., FAR_CONFLICT_FEATURES] = _far_conflict_features(edge, position, direction, speed, active,

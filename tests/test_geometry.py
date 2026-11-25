@@ -19,7 +19,7 @@ from core.layer_search import improve_layer_choices, improve_three_aircraft_choi
 from core.native_vertical import altitude_paths
 from core.rstd import speed_forbidden_interval
 from envs.bluesky_graph import (
-    FAR_CONFLICT_FEATURES, SELECTED_ALTITUDE_EDGE_FEATURES, SELECTED_ALTITUDE_NODE_FEATURE,
+    CROSS_TRACK_NODE_FEATURE, FAR_CONFLICT_FEATURES, SELECTED_ALTITUDE_EDGE_FEATURES, SELECTED_ALTITUDE_NODE_FEATURE,
     cross_track_km, traffic_graph, with_far_horizontal_observation,
 )
 from envs.bluesky_safety import (
@@ -29,7 +29,7 @@ from envs.bluesky_safety import (
 from envs.bluesky_traffic import sample_routes
 from envs.observations import observe
 from eval.admm_communication import DelayedPairExchange, PairExchange
-from eval.admm_gap_mpc import plan_gap_maneuver
+from eval.admm_gap_mpc import corridor_recovery_heading, plan_gap_maneuver
 from eval.bluesky_collision_trace import _altitude_options, _classify, _component_plan
 from eval.bluesky_layer_fallback import _partial_layer_choices
 from eval.graph_statistics import GraphStatistics
@@ -40,7 +40,8 @@ from eval.stage_acceptance import (
 from models.graphformer import Actor, mirror_observations
 from train import bluesky_td3, td3
 from train.bluesky_td3 import (
-    _cross_track_penalty, _initialize_selected_altitude_weights, _reset_far_conflict_weights, _unprotected_worlds,
+    _cross_track_penalty, _initialize_cross_track_weights, _initialize_selected_altitude_weights,
+    _reset_far_conflict_weights, _unprotected_worlds,
 )
 from train.bluesky_stage2 import _meets_development_floors, passes_native_development
 from train.td3 import (
@@ -820,10 +821,12 @@ def test_selected_altitude_features_separate_autopilot_target_from_route_and_pre
                    lnav=active, active=active, center_latitude=0.0, center_longitude=0.0, airspace_half_km=60.0)
     old_plan_b = traffic_graph(**options, planned_altitude=selected, selected_altitude=selected)
     new = traffic_graph(**options, planned_altitude=altitude, selected_altitude=selected,
-                        selected_altitude_observation=True)
+                        selected_altitude_observation=True, route_origin=(latitude + 0.04, longitude))
     assert new[2][0, 1, 0] and torch.equal(new[2], old_plan_b[2])
     torch.testing.assert_close(new[0][..., 3], torch.zeros_like(new[0][..., 3]))
     torch.testing.assert_close(new[0][..., SELECTED_ALTITUDE_NODE_FEATURE], -old_plan_b[0][..., 3])
+    assert not old_plan_b[0][..., CROSS_TRACK_NODE_FEATURE].count_nonzero()
+    assert new[0][..., CROSS_TRACK_NODE_FEATURE].count_nonzero()
     target, rate = SELECTED_ALTITUDE_EDGE_FEATURES
     torch.testing.assert_close(new[1][0, 1, 0, [target, rate]], torch.tensor([1.0, 0.5]))
     assert not new[1][0, :, 2, [target, rate]].count_nonzero()
@@ -835,10 +838,12 @@ def test_selected_altitude_features_separate_autopilot_target_from_route_and_pre
     with torch.no_grad():
         original = actor(*old_plan_b)
         _initialize_selected_altitude_weights(actor, optimizer, from_plan_b=True)
+        _initialize_cross_track_weights(actor, optimizer)
         migrated = actor(*new)
     torch.testing.assert_close(migrated.logits, original.logits)
     torch.testing.assert_close(encode_action(migrated), encode_action(original))
-    assert not optimizer.state[weights]["exp_avg"][:, (3, SELECTED_ALTITUDE_NODE_FEATURE)].count_nonzero()
+    migrated_columns = (3, SELECTED_ALTITUDE_NODE_FEATURE, CROSS_TRACK_NODE_FEATURE)
+    assert not optimizer.state[weights]["exp_avg"][:, migrated_columns].count_nonzero()
 
 
 def test_correlated_yaw_changes_only_yaw_signs_in_half_of_yaw_worlds():
@@ -1504,6 +1509,25 @@ def test_decentralized_gap_mpc_breaks_symmetry_preserves_yaw_and_checks_inertia(
     yaw_cmd, hold_c, plan_c = plan_gap_maneuver(clear_state, active, yaw_proposal)
     assert hold_c.item() == plan_c.item() == 0
     torch.testing.assert_close(yaw_cmd[0, 0], yaw_proposal[0, 0])
+
+    nodes = torch.zeros(1, 2, 24)
+    angle = torch.tensor([[-20.0, 20.0]]).deg2rad()
+    nodes[..., 5] = angle.sin()
+    nodes[..., 6] = angle.cos()
+    nodes[..., CROSS_TRACK_NODE_FEATURE] = torch.tensor([[-0.9, 0.9]])
+    previous = torch.tensor([[-0.89, 0.89]])
+    heading = corridor_recovery_heading(nodes, previous, 6.0)
+    torch.testing.assert_close(heading, torch.tensor([[-1.0, 1.0]]))
+    torch.testing.assert_close(corridor_recovery_heading(nodes, None, 6.0), torch.zeros_like(heading))
+    torch.testing.assert_close(corridor_recovery_heading(nodes, previous * 2, 6.0), torch.zeros_like(heading))
+    nodes[0, 1, 8] = 1.0  # LNAV remains in control if engaged.
+    heading = corridor_recovery_heading(nodes, previous, 6.0)
+    torch.testing.assert_close(heading, torch.tensor([[-1.0, 0.0]]))
+    local, before, after = plan_gap_maneuver(clear_state, active, proposal, route_heading=heading)
+    assert before.item() == after.item() == 0
+    torch.testing.assert_close(local[..., 2], heading)
+    local_conflict, _, _ = plan_gap_maneuver(state, active, proposal, route_heading=heading)
+    torch.testing.assert_close(local_conflict, commands)
 
     # (4) Accelerated vertical inertia contact is detected even when linear forecast would miss it.
     trap_pos = torch.tensor([[[0.0, 0.0, 103.8628], [1000.0, 0.0, 201.0156]]])

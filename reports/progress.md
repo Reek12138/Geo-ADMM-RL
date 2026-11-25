@@ -2089,3 +2089,181 @@ MPC 首批 6 s／12 s 热启动配对已验真，Exp 5 累计 19/61。6 s 无通
 Jacobi 审核封存 18 份原生结果哈希、9 组冷热配对、12 组丢包与 12 组发送延迟的同种子单变量对照。审核 SHA-256 为 `4729c5d8c084dbf6c5fc3ee14cb4e9ee2f7613f705f9a0a27cb21aa9df324459`。首个零丢包零延迟着色回放已开始。[Jacobi 完整逐种子审核](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/paper-mpc-exp1-exp5.wrrcMn/exp5-network-jacobi-audit.json)
 
 首个着色与 Jacobi 同条件配对已验真，Exp 5 累计 44/61。K=2 热启动、零丢包零发送延迟时，着色为 347 到达／12 碰撞／1 越界，Jacobi 为 350／10／0；着色的平均批决策耗时多 4.810 ms。结果 SHA-256 为 `d7fb8b65d817a2c68b695ecdb1cbde98b3c8c0a3a063cb8f013ac52b2328c1ce`。任务 59 运行中，任务 60 已排队。[首个着色逐种子对照](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/paper-mpc-exp1-exp5.wrrcMn/exp5/loss-delay-coloring/k2-warm-colored-loss-0-delay-0/comparison.json)
+
+#### v2 前置 Step 1 的 v1 续跑记录
+
+先按指定命令复核同步源码，共 80 项通过。Task 60 原日志确认在 Exp 6 创建预置目录时抛出 FileExistsError。Task 61 在 CPFS 新目录采用固定 v1 控制器，覆盖修复后的 Exp 6 入口并加入审计器的只读继承入口。原 Exp 1–5 通过继承审核，匹配的单步权重复用 1,523 决策和 15,000 更新，SHA-256 为 `4b0fd82280a72dc8dd705da5ff04f2f1984b836d73933a4104c23872340fb1d7`，15 份预置 Geo 回放与 Exp 1 逐字节相同。全程复用同一个现有导航缓存。
+
+| 原生 0.05 s 六场景 | 到达／碰撞／越界／超时（360 架） |
+| --- | ---: |
+| 24 步开保护 | 355/4/1/0 |
+| 1 步开保护 | 348/10/2/0 |
+| 24 步关保护 | 220/140/0/0 |
+| 1 步关保护 | 193/167/0/0 |
+| 24 步去潜在边 | 332/28/0/0 |
+
+24 步权重的开关保护臂逐项复现正式留出的 30 个逐种子终局。匹配对照 SHA-256 为 `7e242afe308d9efd55eb7ab7f56a483ca6c77c3e2bf08e53d71164f42c335832`，去潜在边报告为 `de9a61bc813320d082952c8f92fe367fa3f00dac0390730c833637ec4d12de1c`。KSS 替代仍在补跑，最终全矩阵封存待该子面板闭合。任务 62 在同一单卡后排队，其启动入口先检查 Task 61 退出码和 Exp 1–6 全通过。[v1 新目录续跑](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v1-exp6-resume.aVT9yx/run.sh)
+
+v2 首次开启横航迹的迁移核验发现冻结 15k Actor 的预留第 9 列有 256 个非零权重（L2＝1.8018347025）。在同一合成双机图启用横航迹后，冻结 Actor 的最大 logits 差为 0.0208756924。工作区补齐 Actor、Critic、目标网络和锚点首次启用时的列清零，以及已载入优化器的对应缓冲清零；复测最大 logits 差为 0。选定高度观测仍沿用 Plan B 的反号迁移。80 项回归复跑全通过（34.52 s）。本项属于 v2 初始化核验，Task 61 和 Task 62 继续使用提交时的独立源码快照。
+
+##### Step 1 正式封存
+
+Task 61 正常退出，完整审计再次独立复跑与封存结果逐项相同。核验 182 份证据、Exp 1–6 齐全及 Exp 5 的 61 个配置，继承原始 Exp 1–5，补跑 Exp 6。发布权重继续是 SHA-256 `5a0982e5767b5544942035cf70fe28cf5fb6e46492657c923eaefec59555b1fe`。
+
+| Figure 4 替代 | Geo 到达／碰撞／平均单机成本 | Geo+KSS 到达／碰撞／平均单机成本 |
+| --- | ---: | ---: |
+| Case 1 | 250 / 0 / 5.367 | 248 / 2 / 7.074 |
+| Case 2 | 250 / 0 / 4.695 | 248 / 2 / 5.544 |
+| Case 3 | 250 / 0 / 3.305 | 250 / 0 / 3.752 |
+| 总计 | 750 / 0 / 4.455 | 746 / 4 / 5.457 |
+
+完整审计 SHA-256 `d8db038bf42b0538122f407b577b0f6734b91f0b99a371e3f5539316630b11e0`，Exp 6 汇总 `415ec038e3647d1236873ce291fd8cad13a1ecd8647a242a3ed96f8f06dcf578`，15 份 KSS 替代汇总 `f370cd0b6626fdc66d274df5b301f8ad0a5856768ea4d042c7bcd53f98990a15`。Task 62 在封存完成后接手单卡，进入双开发面板。[v1 全矩阵封存](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v1-exp6-resume.aVT9yx/paper-final-audit.json) · [Exp 6 最终汇总](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v1-exp6-resume.aVT9yx/exp6/summary.json)
+
+#### Step 2 启动修复与原生对照
+
+Task 62 的 Python 入口缺少主进程保护，原生 worker 的 spawn 重新执行评测后碰到已建输出目录，未产出有效对照。保留失败日志，另建 CPFS 目录补齐入口保护。实际单 worker、4 个原生控制步的启动冒烟通过；另一个 2 边 3 步合成探针验证尝试发送 6 次、送达 4 次、在途 2 次，零重复。重提前原命令 80 项通过（20.22 s）。Task 63 已运行双开发面板，配置 SHA-256 清单的摘要为 `070fde2c0c7ff3a5b9db872d82611b737517d590446d4c8d637ca460d0752177`。正式种子入口由两个开发面板及其逐种子 MPC 预测约束共同控制。[失败日志](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v1_1-fixed-transport-mpc.1zArep/validation.log) · [新目录运行入口](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v1_1-fixed-transport-mpc.1rPxqL/run.sh)
+
+##### Step 2 双开发面板实测
+
+冻结同一个 15k 权重，原生 BlueSky 0.05 s，12 s MPC；对照为旧控制器的同权重，同面板前期开保护协议。v1.1 两组均未通过原生开发准入。每组 30 个逐场景逐种子的预测接触总量均满足计划值不高于保持值。
+
+| 开发种子起点 | 旧到达／碰撞 | 新到达／碰撞／越界 | 六航路旧→新到达 | 保持→计划预测接触 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 61231 | 355 / 4 | 341 / 18 / 1 | 58→50 / 60 | 209→133 |
+| 75121 | 350 / 10 | 337 / 22 / 1 | 54→48 / 60 | 276→177 |
+
+两份原生报告 SHA-256 依次为 `9a1c4abfedff63b6089b0bab5753d8247ac69f9e663251a98acde16f83f03b3c`、`07fe10a2ac0a6ba84e0ceaf59a123ab4496dd569dfd5fc107feffe27594e4fb3`。因开保护闭环回退，Task 63 后续周期与延迟探针转到开发种子，正式留出保持封存，v2 训练未提交。预测计数满足单调约束仍需与原生碰撞独立判定。[Step 2 进展与原始报告索引](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v1_1-fixed-transport-mpc.1rPxqL/validation-in-progress.json)
+
+##### Step 2 六航路回退定位
+
+用固定同一 15k 权重、同一个原生 0.05 s CPU 切片，在六航路的 61231、75121 两个开发种子做 ADMM 和 MPC 的四臂交叉。两臂全旧与全新分别复现对应 PPU 的逐种子终局。
+
+| ADMM／空窗 MPC | 61231 到达／碰撞 | 75121 到达／碰撞 |
+| --- | ---: | ---: |
+| old-old | 12 / 0 | 10 / 2 |
+| new-old | 12 / 0 | 10 / 2 |
+| old-new | 10 / 2 | 8 / 4 |
+| new-new | 10 / 2 | 8 / 4 |
+
+这两个种子的终局随 MPC 实现切换。四臂 SHA-256 为 `e59a8986e72b855d40b665aafd1172496d8f7fa3eeae1df7332996f4f3aed6f9`。逐帧回放 SHA-256 为 `0cf83ce6a02aa66a9986037686706ce46f2641db1c4cab2ab80c75ed45b89b56`。61231 第 73 决策把 0、1 号机预测水平最近点由 4996.658 m 提到 5004.178 m，并把预测接触从 1 降到 0；第 74 决策第 82 帧在 4999.892 m 水平、3.724 m 垂向触发真实接触。两个冻结状态及计算的证据 SHA-256 为 `af82e7290a018cdbd946f3f54b19693b28e15492685b34293e0e8ddfd7d7cd69`。
+沿用现行 ADMM 已有的 20 m 水平裕度做独立反事实，只扩大 MPC 的试验半径。61231 恢复至 12/12 到达、0 架碰撞；75121 仍为 8/12、4。该试验不改 Task 63 控制器。反事实汇总 SHA-256 为 `3fa22f4a8676bdbfca761b7fae93ff481c1a240cd75be228eeee5c3c36a4402f`。
+旧版 18／30 s 偏航已在同一个 61231 开发面板补齐冷热参考。热启动 18 s 的偏航越界为 0→0，30 s 为 3→3。历史正式 7–11 为部分配置的六场景总越界，与本组开发偏航分项分开报告。[四臂和逐帧诊断](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v1_1-component-diagnosis.1Wj3a6) · [开发偏航同种子参考](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v1_1-cadence-yaw-reference.RTQHRb/reference-summary.json)
+
+##### Step 2 周期配对和六航路候选验证
+
+61231–61235 的八个通信周期配置均完成。每个配置六个场景 × 五个种子，所有 240 条场景种子记录都满足 `planned_predicted_pair_contacts <= hold_predicted_pair_contacts`。18 s 热／冷启动的偏航分项分别为 116 到达／4 碰撞／0 越界、114／6／0；30 s 分别为 115／2／3、116／2／2。四个配置逐种子结果均与旧版同开发种子偏航参考一致。30 s 热启动仍超过 2 架的门槛。配对审计 SHA-256 为 `b34c0a7000dfc9c450bc4705fd6f55f85c91a33aeb599e0fcff817e964ebb79c`。[周期配对与全部预测接触数](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v1_1-fixed-transport-mpc.1rPxqL/development-cadence-audit.json)
+
+75121 六航路的 3／4 号机从第 65 决策就进入预测冲突，第 76 决策第 101 帧真实碰撞。全层候选会带来第三机接触，试验加入半层后仍为 8 到达／4 碰撞。故障前六次空窗的冻结状态上，单机 41×41 调速／调高候选及双机分别 21×21 的组合均未找到满足双方与第三机分离的候选，评估固定航向、其他飞机保持已选指令。对应决策追踪、单机网格、双机网格 SHA-256 依次为 `d15a82824b4ec211ff06f89d67991c0a93d2ae6ffa6c5c639330e71be60975a6`、`6d4d1eda24c72e107de15a73e9b05f54477403354caf172feabc0ba2a5fd3106`、`2888133c77c032a6b34167da701fc7c8226a3774d87a6bc403c5f6dbdbe900d1`。[冻结候选](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v1_1-gap-candidates.XTxLuN/candidates.json) · [单机网格](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v1_1-gap-local-feasible.RGk5CN/nominal-peer-candidate-screen.json) · [双机网格](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v1_1-gap-pair-feasible.Mu8lnt/pair-compatibility.json)
+
+在只改变局部候选集的独立原生 0.05 s 试验中，加入旧版已有的 ±5° 纯航向候选，保持邻机预测与零通信决策。61231 六航路由 10 到达／2 碰撞变为 12／0，预测接触 1→0；75121 由 8／4 变为 10／2，预测接触 19→15。该候选只在试验副本中启用，双开发面板验证另行记录。汇总 SHA-256 为 `2f1ba293da7cf74b8cdbbaecd080e8ee6499996801990433953a6cea6bbecd7a`。[航向候选原始报告](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v1_1-conflict-heading-probe.oTF3N1/summary.json)
+
+##### Step 2 两条 MPC 修复的独立原生对照
+
+加入 ±5° 冲突候选后，原生 0.05 s、12 s 周期的 61231–61235、75121–75125 两个开发面板均为 **355/360 到达、4 碰撞、1 越界**，近对头均 60/60，六航路均 58/60，预测接触分别 146→34 和 183→52；60 条场景种子记录均通过预测接触计数检查。两面板 SHA-256 依次为 `3a22eeab1676483c46dd51b96f7b14e181a4c5bd2265e2ee3d2edf8f29cf7450`、`8808c588ea6eaaa8e7b262ded88f0d46f0bdc81bf6a4b69f07369d66c191c5b5`。[61231–61235](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v1_1-heading-dev-probe.XaapwR/panel-61231/comparison.json) · [75121–75125](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v1_1-heading-dev-probe.XaapwR/panel-75121/comparison.json)
+
+30 s 热启动三个越界样本为 61234 的负偏航和正偏航、61235 的负偏航，发生在零起始编号的第 68、81、87 决策，目标方位误差分别 +24.254°、−21.861°、+16.140°。三机越界前各有 25 次空窗，均无本机预测冲突，能执行的 Actor 纯航向提议分别为 0、1、1 次。只要有方位误差就回正的反事实让 61235 由 11 到达／0 碰撞／1 越界变为 8／4／0。用本机横向偏差及变化率预测未来 120 s 是否越出 20 km 边界，再在空窗与无冲突时限幅回正，三个场景均由 11／0／1 改为 12／0／0。该反事实将横向偏差仅送给 MPC，冻结 Actor 原输入仍为零。配对审计 SHA-256 为 `b630abeea8eb98c017b1306c99f0019f6965c92cb7e46bab8bea85ab98e009f4`。[偏航逐种子配对和原始轨迹 SHA-256](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v1_1-yaw-corridor-probe.zFEV7H/paired-yaw-diagnosis.json)
+
+两项改动已经在新 CPFS 源码候选组合，重新跑 12 s 双开发面板及 18／30 s 冷热偏航。首次候选进程在启动前发现冻结源码缺少当前横向偏差常量，已同步工作树中的横向偏差模块及兼容迁移；旧的失败日志保留在候选目录中。组合 MPC 与原生调用点 SHA-256 分别为 `23c0a155e4831f0859362f0b7a7ba3ef1fd8af2b02d72e381989ec38c20ffe6d`、`0e805831da04b26cc6bbf8dd05271d9b760c8f259cd4fa9ac40a67c7dde73a94`。历史检查点、历史正式评测及 Task 63 源码均保持冻结。[组合开发试验](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v1_1-mpc-corridor-integration.i8XA4r)
+
+组合候选的原生 0.05 s 双开发门控均通过。61231–61235 从 Task 63 的 341 到达／18 碰撞／1 越界升至 **356／4／0**（上一版 355 到达），75121–75125 从 337／22／1 升至 **355／4／1**（上一版 350 到达）。预测接触分别为 146→34 和 186→53，逐场景种子违例均为 0。两份报告 SHA-256 为 `0923243c2fb51435d645f5fe0c36a0e2225f8f8e2ea9c61124aaedf1654411f4`、`64ec79b9c490b7dc14c4223db6d706cf3e3b5c471c38ca8b6bd73c44b66a0255`，双面板审计为 `85af51af7c70a03ce11ad9389b102ab3127c87e82b747c10c8eaa9a58a03dbfc`。[双开发门控](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v1_1-mpc-corridor-integration.i8XA4r/development-summary.json)
+
+| 61231–61235 偏航，原生 0.05 s | 原到达／碰撞／越界 | 组合到达／碰撞／越界 | 组合报告 SHA-256 |
+| --- | ---: | ---: | --- |
+| 18 s 热启动 | 116／4／0 | 120／0／0 | `1b59939d51c23b89bc028d43cb77e425327e2d981d06365670a323853c24cdf5` |
+| 18 s 冷启动 | 114／6／0 | 120／0／0 | `486b2f0eb925f7db49e233b704afd9a839ae6e03ab364ac7a61e9d0268375b96` |
+| 30 s 热启动 | 115／2／3 | 119／0／1 | `28a32be583dcfc8460bf5694405c915e87ca4cbb6a83a5e04c986cb4ce2c710a` |
+| 30 s 冷启动 | 116／2／2 | 120／0／0 | `5aaafc205d8b798f85407aec951a3255fb8dcce37f4c9acdc94dc6e849f56934` |
+
+四组开发偏航共 40 条场景种子记录满足预测接触单调约束。组合候选 80 项回归全部通过（6.31 s），日志 SHA-256 `66eb2a2259ab202866e5ebb5c3060572d2a54a0f3280fdcc924df3b127a45f4f`。快照回归显式复用共享原作者求解器夹具。[组合回归与周期报告](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v1_1-mpc-corridor-integration.i8XA4r)
+
+SOFY Task 64 在已授权单卡队列中排在 Task 63 之后。64 将重新核对 63 的全部 12 个传输报告哈希和活跃边计数，先测原生双开发面板与 18／30 s 六场景，再在通过后跑正式留出。Task 64 输入清单 SHA-256 为 `908e670ef627a7d8ba1a585a063212f739f3aabf97d99bc10e0a1c8e43445d5b`。截至此记录，正式留出尚未打开，v2 训练尚未提交。[Task 64 快照和提交记录](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v1_1-fixed-transport-mpc.kC4evi)
+
+##### Step 2 延迟通信矩阵封存和单卡交接
+
+Task 63 已退出（进程退出码 0），延迟通信 12 个配置全部完成独立复核。共 360 条场景种子记录、475,432 次发送。逐求解通道活跃边每控制步发送一次，所有发送数与逐步计数相等，重复发送为 0，已使用消息的龄期均不早于设定延迟。20% 档合计 31,475/157,948（19.927444%），50% 档合计 79,191/157,854（50.167243%）。原控制器仍因双开发质量和 30 s 热启动偏航越界被阻止晋升。输运报告 SHA-256 为 `ac123a9df38f3cee5f5808e1af1f4aecf0bdcb7c3e28562e598ac49accec587a`，Task 64 已接手同一单卡并核对该封存结果。[Task 63 封存报告](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v1_1-fixed-transport-mpc.1rPxqL/validation-summary.json) · [Task 64 复验](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v1_1-fixed-transport-mpc.kC4evi)
+
+| 原生 0.05 s、K=2 | 发送 | 丢包 | 实测丢包率 | 对应报告 SHA-256 |
+| --- | ---: | ---: | ---: | --- |
+| k2-warm-loss-0-delay-1 | 40,453 | 0 | 0.000000% | `8044a1133612dae340dced2c6d55c6640b97235f1ccbb4fd3f65de94a3e5e54d` |
+| k2-warm-loss-0-delay-2 | 39,546 | 0 | 0.000000% | `3a56ce085aa40c7e706336d4f3429166eab28d7d4d1afc49f05ffbc6952bf84b` |
+| k2-warm-loss-0.2-delay-1 | 39,830 | 7,914 | 19.869445% | `ae30caba16a5250309bf8f5755d2360815658bed12ab370e53c68165bc016f25` |
+| k2-warm-loss-0.2-delay-2 | 39,627 | 7,892 | 19.915714% | `877cf32da5b88a5572e1d1b33254c8b6d17e0488a96716fa37cb410599c8307c` |
+| k2-warm-loss-0.5-delay-1 | 39,263 | 19,706 | 50.189746% | `fc3569d3e1ca48bc5177c5f958215b4544d44343df1c6551a5d0e79a693cb5a5` |
+| k2-warm-loss-0.5-delay-2 | 39,788 | 19,997 | 50.258872% | `91dddb53608d933eb807ce68390b65ecf728c75d4c7afcdb83b9a44118a4f73a` |
+| k2-cold-loss-0-delay-1 | 39,470 | 0 | 0.000000% | `90fc062afa6402b9f6042282479f97db4186bda7acff75a5a26559f48ac9a8a8` |
+| k2-cold-loss-0-delay-2 | 40,161 | 0 | 0.000000% | `815b2bd7b8958c4b90d20360314299dd0eb4c646e56bd6881d48e35e92f619b6` |
+| k2-cold-loss-0.2-delay-1 | 38,589 | 7,709 | 19.977196% | `115377b0fa8e6ae8120f9bd23e3af97b67b500bdd373a6382c97dffc8bbaebe9` |
+| k2-cold-loss-0.2-delay-2 | 39,902 | 7,960 | 19.948875% | `08ebc8820ecb757348e3d4d0287c11ec60284d59b6396942216545e7425ffa91` |
+| k2-cold-loss-0.5-delay-1 | 39,074 | 19,568 | 50.079337% | `51e4e668c74bcfd8941519c9517bb5afaa62df044bb3e11dc8685af2c07595e8` |
+| k2-cold-loss-0.5-delay-2 | 39,729 | 19,920 | 50.139696% | `5cd77331dbf32ae8c917f099640cde5424170aae5153fddc6f4bbbc2333f1cf3` |
+
+Task 64 单卡原生 0.05 s 双开发面板均已复现组合候选的到达、碰撞及越界。61231 为 **356／4／0**，预测接触 146→34，报告 SHA-256 `e6857845cd217280ef53083f5c8ecaf1c9961cdc23ae05c8a97928d6701a358e`；75121 为 **355／4／1**，预测接触 185→53（CPU 观察为 186→53），报告 SHA-256 `37c414e8672d6a1e25f2b77ad97921417308c062de6e822e38e9b1c728de2893`。两面板逐场景种子预测计数违例为 0，18／30 s 全场景复验进行中。[单卡双开发结果](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v1_1-fixed-transport-mpc.kC4evi/validation-in-progress.json)
+
+独立复用原镜像审计的四组 256 个冻结原生状态，共 2,477 个活动机决策。相同冻结 15k 权重下，Actor、标准 ADMM 投影和组合空窗 MPC 的速度、高度、航向指令反射误差均为 0。镜像审计 SHA-256 为 `4eb156875218b215e7a8ecb109d41de249ec9729da7ff083094171441365ce3d`。[256 状态镜像复核](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v1_1-mpc-mirror-audit.uiQNGe/symmetry.json)
+
+Task 64 的 18／30 s 单卡六场景开发周期验收已完成。18 s 热、冷均为 358 到达／2 碰撞／0 越界，预测接触分别 203→37、209→44；30 s 热为 359／0／1、236→39；30 s 冷为 360／0／0、230→39。四组逐种子预测接触违例均为 0，偏航越界依次 0、0、1、0。原始 SHA-256（18 热、18 冷、30 热、30 冷）分别为 `e5fa6c9d84e3e50da4f4e29b66b54484d14b53d60269083518d5998417aae728`、`da3ed8acbeac0de39edf63f5356f49f09a8c71483e8114dd4d44de92d28983f8`、`80d79947c26da9c6f16ad81953bf79dfb3e3a3c845a4cf349b4cc399dae72e89`、`46a0a4fe12191dcf0c0c1a638e7c3f57f516cba7cfd4dfba283aa473082dbb7e`。双开发和周期门控通过后，Task 64 首次打开本轮的 12001–12005 正式留出。[开发周期与正式留出进度](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v1_1-fixed-transport-mpc.kC4evi/validation-in-progress.json)
+
+Task 64 的 12 s 正式留出为 **352/360 到达（97.78%）、8/360 碰撞（2.22%）、0 越界**，冻结 v1 为 355／4／1。三、四、六航路各 58／60 到达并各 2 碰撞，近对头和正偏航均 60／60，负偏航 58／60、2 碰撞。全场景单机平均动作成本为 26.496213，预测接触 198→61，30 条场景种子记录无计数违例。正式报告只用于验收。SHA-256 为 `5deeb007fec395736537d0569c89c89aeb86ed5f9e0086368879b4e552352773`。6／12／18／30 s 正式配对继续执行。[正式 12 s 原始报告](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v1_1-fixed-transport-mpc.kC4evi/formal-holdout/comparison.json)
+
+20k Stage 1 入口已在独立 CPFS 目录静态准备，提交门控为 Task 64 完整通过并退出。采样会复用同一零通信空窗控制器，空域重置时同步横向偏差历史。候选源码 80 项回归通过。入场权重四案 Q 为 4/4（报告 SHA-256 `50a663168aeba946c9a8187e84b19fc7b26ed0c2bfa2d2b47e2536a7cc378428`），256 状态镜像误差为 0，三个热启动头权重差的计算在原权重自比时均为 0。还未提交或启动训练。[Stage 1 预检](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate2/b35-v2-joint-admm-mpc-20k.2MDSXG/preflight)
+
+##### Step 2 正式周期对照通过
+
+Task 64 已结束，调度进程退出码 0，`validation_passed=true`。双开发、四组开发周期、12 s 正式留出与八组正式周期共 450 条场景种子记录满足预测接触约束。正式 18 s 热／冷偏航越界 4→0／5→0，30 s 热／冷 7→2／6→1。12 s 正式成绩为 352／360 到达、8 碰撞、0 越界，较冻结 v1 多 4 碰撞，仍低于 v2 最终晋升要求；本阶段接收按通信与 MPC 指标执行。逐报告哈希均已核对，最终 summary SHA-256 为 `241184a9adaf8bae6c78a43d6866e12e14936586cc924797be863bc78672c7b4`。[Step 2 正式验收](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v1_1-fixed-transport-mpc.kC4evi/validation-summary.json)
+
+| 正式原生 0.05 s 周期 | 冻结版到达／碰撞／越界／未决 | v1.1 到达／碰撞／越界／未决 | 偏航越界 | v1.1 预测接触 | SHA-256 |
+| --- | ---: | ---: | ---: | ---: | --- |
+| k2-warm-period-6 | 350／10／0／0 | 349／10／1／0 | 0→1 | 0→0 | `9f9e2bc7cf0c5bc5adc958c3bce06cdf02971a2b6e0f62c9992eb0940d2d5cde` |
+| k2-warm-period-12 | 351／8／1／0 | 347／12／1／0 | 1→1 | 212→77 | `2ae1738f9b6f8564d35e47352496e36ef41bdf69244cecbc9ed13ec947e70c71` |
+| k2-warm-period-18 | 353／2／5／0 | 356／4／0／0 | 4→0 | 188→35 | `757a9a7aa9f4bc0b22d7a6a6acc0a9ac0b7bc2f3a921b732b628f8bddc992e4c` |
+| k2-warm-period-30 | 346／4／10／0 | 353／4／2／1 | 7→2 | 225→44 | `b72c9b5cc819971549ca86ecf00acf3609cfa49834569d45d3c5c643c543a712` |
+| k2-cold-period-6 | 345／14／1／0 | 342／16／2／0 | 1→2 | 0→0 | `e0377ce72f29e6369e8317ce8c7729f8200fad69f49528fecdfa07d3b94ad951` |
+| k2-cold-period-12 | 351／6／3／0 | 350／10／0／0 | 3→0 | 220→80 | `12ace919b0b1aec9b5c15f3a19cec65d9e24adb35c3093c9da821739b4a4ec51` |
+| k2-cold-period-18 | 353／0／7／0 | 350／10／0／0 | 5→0 | 226→70 | `0ddbc6f46cae6526400a286a8e59844595b45bb0e47ed54bc050396773692d2e` |
+| k2-cold-period-30 | 343／6／11／0 | 353／6／1／0 | 6→1 | 233→66 | `86e3d8f264ff856f84f0052f994126069c8470594f78919dc5c46ab23033668e` |
+
+##### Step 3 Task 65 联合训练已启动
+
+Task 65 已在原 1 卡 PPU 开始运行，初始化使用冻结 15k 权重和 Critic。实际配置 SHA-256 `0aa3380239a972a436e00f1daae50246cffdc6bd7ad4a8dd0a5b96310b19afea`，完整输入清单 SHA-256 `562a0e02d9cf40023eeac87801be27deffd5e1862dc5003f9cfd0cbe4f04b167`，经核对的 Step 2 终审 SHA-256 `241184a9adaf8bae6c78a43d6866e12e14936586cc924797be863bc78672c7b4`。实际参数为 Plan B、512 空域、35 km、0.25 s 物理、6 s 控制、12 s MPC、24 步多步回报，`coordination_weight=0.15`、裕度 6 m、`projection_weight=0.25`、10% 原始采样、选中高度与横向偏差观测。学习率沿用上一轮的 1.2e-4 及 20k 更新余弦衰减，按本轮更新数保存 5k／10k／15k／20k。首条记录到 270 次更新，8.6776 updates/s，累计协调损失均值 4.9194e-08。四个里程碑均执行双原生开发面板开／关投影、四案 Q、256 状态镜像及三个热启动头差分。v2 正式种子门控保持封存。[Task 65 确切配置](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate2/b35-v2-joint-admm-mpc-20k.2MDSXG/training/config.json) · [训练日志](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate2/b35-v2-joint-admm-mpc-20k.2MDSXG/training/metrics.jsonl)
+
+##### Step 3 入场无投影对照与观测迁移归因
+
+冻结 15k 权重在原生 0.05 s 的无投影对照为 61231–61235 **232/360** 到达、75121–75125 **216/360** 到达。各场景到达数依次为三航路、四航路、六航路、近对头、正偏航、负偏航，第一面板 42／27／28／44／42／49，第二面板 44／26／20／40／40／46。报告 SHA-256 分别为 `b1f2d83087b4b3a3d8371ca7f84682d53f1b29c746893cc4781b72333ff98b46`、`f668100900b707819bd2a94c2f0dcb62c1f506dfc9ab4a6e269a792fb1aa3bf3`。[冻结权重无投影开发面板](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v2-raw-development-reference.Xp5sKR)
+
+为区分新增观测与学习的作用，使用训练同样的权重迁移，仅打开选中高度与横向偏差观测，零更新重跑四案首步 Q。在原生观察中，Q 排序由冻结权重的 4/4 变为 3/4，失败的六航路 30 s 案 Q 差为 −1.19612885。5k 同案为 −2.083965，四案仍为 3/4。负号在学习前的原生观察迁移已经出现，5k 负差进一步扩大。Plan B 匹配观测的零更新排序为 3/4。零更新审计 SHA-256 `2e2ac48fe8ba42a2d0e314d993fd0aa4f029a6c43e55b84ffefbed464d6a3225`。[独立零更新 Q 审计](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v2-initial-observation-q-audit.2F63q4/critic-q.json)
+
+四案历史脚本使用默认 20 km 建图。补充探针按 checkpoint 实际 35 km 观测重建同一批冻结状态，仅改变建图范围。冻结、零更新迁移、5k 的变更飞机排序分别为 3/4、1/4、3/4，六航路 30 s 案对应 Q 差为 −101.0690、−72.0774、−3.1339。因测试口径不同，里程碑保留原同口径四案排名。35 km 补充探针 SHA-256 为 `cab1f1861151ed2a9cab478cd663559327bbbea89af4e3f7092de30885be2f59`。[35 km 对照](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v2-initial-observation-q-audit.2F63q4/q-profile-range.json)
+
+##### Step 3 Task 65 5,000 更新里程碑
+
+配置累计至 523 决策、987 轮、9.3611 updates/s、6652.34 轮/h，Torch 峰值 3222.5 MiB。截至归档时全任务 PPU 样本均值 38.43%（120 个样本，含原生审计与启动）。断点 SHA-256 为 `6369b73d7cc239955fed9d6d8cea1c87ccca4e217e400e64b74c2bcb57d7519c`，里程碑摘要 SHA-256 为 `25ec777fad5bb20ed396b0c3385e49b81f6a443daac8216f051dcf3a999b8634`。[里程碑摘要](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate2/b35-v2-joint-admm-mpc-20k.2MDSXG/milestone-05000/summary.json)
+
+| 双开发面板 | 开投影到达／碰撞／越界 | 关投影到达／碰撞／越界 | 冻结 v1 关投影到达 | 预测接触违例 | 报告 SHA-256 |
+| --- | ---: | ---: | ---: | ---: | --- |
+| 61231–61235 | 338／22／0 | 207／136／17 | 232/360 | 0 | `9c3828ee63832e5c88f5e4dfa201ffb505ae4c177bfcec90315703eb2b7e3ec3` |
+| 75121–75125 | 347／10／1 | 189／152／19 | 216/360 | 0 | `1d7a86fc3cc96cef2774cdd48f541fce851f911858dbc538965cdc7345ab524a` |
+
+四案 Q 原生变更飞机 3/4、全活动飞机 3/4，Plan B 匹配观测 3/4。Q 差为 crossing4-120-native=+1.1652031, crossing6-120-native=+0.19997787, crossing6-30-native=-2.0839653, crossing6-60-native=+0.32979584，报告 SHA-256 `2a69c0b229fa7f6cf39600fb09e2f50165b5953eb62ee6497dcfa1a93d5c40df`。
+镜像在 256 个冻结状态的最大误差为 0，报告 SHA-256 `c343663732343b323a38876bc79ba6dceb47c3fbaedbb995e86c49e8a63b6580`。三个热启动头 L2 权重差为 consensus=0.9350287264, altitude_consensus=1.101504323, willingness=0.2294299065。双开发与诊断综合晋升为 未通过。
+
+
+仅迁移观测、不做更新的原生 0.05 s 无投影闭环对照，61231–61235 为 **265/360**、75121–75125 为 **251/360**，相对冻结权重分别增加 33、35 架。5k 权重随后降到 207/360 和 189/360，相对零更新迁移少 58、62 架。初始关投影完整结果的六场景到达分别为 48／40／32／60／38／47 和 44／34／24／56／44／49。两个零更新报告 SHA-256 为 `cf45b21764fc0de9576f8a2e04a991119973284ee0065b1fba0368995dc5d363`、`23ee7aef4a000d616c46c276cf673c29387534723a7d8fa865bf34c7d296003d`。5k 的 75121 面板开投影另有 2 架未决。训练已在 5k 审计后继续；至 5k 共有 27,313/267,776 个空域步走无保护轨迹。[零更新同种子闭环](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v2-initial-observation-dev-raw.nCOEyC) · [5k 全结果](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate2/b35-v2-joint-admm-mpc-20k.2MDSXG/milestone-05000/summary.json)
+
+在同一批 256 原生冻结状态上配对原始动作，零更新到 5k 的正偏航分层模式由 64 降至 6，负偏航由 40 降至 7，调速模式分别由 270→323、253→296。偏航且无冲突图边的 20 个状态均保留正确回航；有图边且需回航的正／负偏航状态中，正确转向分别由 20→22、0→14。原始策略闭环退化伴随明显的偏航分层提议减少。诊断 SHA-256 `8355c5fe0defbb9a685d5a2cc13a536ca51dbe8d9a51926bf66f3393cd2a5eee`。[冻结状态原始动作配对](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v2-initial-observation-q-audit.2F63q4/raw-action-5k.json)
+
+5k 前训练区间单独按 PPU 采样时间对齐，排除后续原生评测。53 个训练区间样本的 PPU 平均利用率为 **80.91%**，峰值 100%。[原始 PPU 采样](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate2/b35-v2-joint-admm-mpc-20k.2MDSXG/ppu-utilization.log)
+
+开发逐帧归因按零更新→5k 额外碰撞量挑出三个显著回退样本，配对零更新、5k、10k 关投影。近对头 75125 的到达／碰撞为 12／0→4／8→2／10，前 65 个决策中的非零调速指令 748→612→110。正偏航 61235 的到达／碰撞／越界为 12／0／0→6／4／2→1／0／11，前 55 个决策的非零航向修正 23→14→3，受修正飞机 12→11→3。负偏航 75121 的终局为 12／0／0→5／6／1→6／2／4。配对堵点包含早期调速和偏航回正减少，具体接触帧与原始轨迹哈希见摘要 `0dbe5fd5c5e800155450ecc1d491fae6e5ad5d8e62f907432e88a07dfcf07472`。[三组成对原生轨迹](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate3/v2-raw-regression-traces.9Ahc9S/raw-regression-paired.json)
+
+##### Step 3 Task 65 10,000 更新里程碑
+
+配置累计至 1,023 决策、2,059 轮、9.3299 updates/s、6915.72 轮/h，Torch 峰值 3222.5 MiB。训练活动区间 PPU 利用率均值 80.32%（107 个样本）。断点 SHA-256 为 `2d5663490f6e9dd683af74259224920d844206344d88a91659d043576e623b6d`，里程碑摘要 SHA-256 为 `15fd7d91f92dad1dd96d44421b0e8d29c52c8b5944869f2be235885eab31f995`。[里程碑摘要](/dataset-cpfs5/vtm-foundation-pretrain/personal/zhuy25/Geo_ADMM_RL_20261123/bluesky-gate2/b35-v2-joint-admm-mpc-20k.2MDSXG/milestone-10000/summary.json)
+
+| 双开发面板 | 开投影到达／碰撞／越界 | 关投影到达／碰撞／越界 | 冻结 v1 关投影到达 | 预测接触违例 | 报告 SHA-256 |
+| --- | ---: | ---: | ---: | ---: | --- |
+| 61231–61235 | 350／6／4 | 169／152／39 | 232/360 | 0 | `cf6fb9d1ada05a2643d774da3f967518bc739cf5b06542f9228f0289416fb065` |
+| 75121–75125 | 346／10／1 | 159／156／45 | 216/360 | 0 | `6a92edbf75917e3f16bb24e78c00ff4100c2cdb7bf5e935525f18e6d5813e9b2` |
+
+四案 Q 原生变更飞机 2/4、全活动飞机 3/4，Plan B 匹配观测 2/4。Q 差为 crossing4-120-native=-0.35467911, crossing6-120-native=+0.13114929, crossing6-30-native=-3.7714691, crossing6-60-native=+1.1956329，报告 SHA-256 `6655b1bfa6ba9efedd8ab692582c1c6fe2abf132be5adb1a7cb95292eadaa471`。
+镜像在 256 个冻结状态的最大误差为 0，报告 SHA-256 `31c866d4646d3dd36c82aa8cd75de9b9fe5e643f95b631710625dac806e8bede`。三个热启动头 L2 权重差为 consensus=1.252249118, altitude_consensus=1.771196032, willingness=0.3249069103。双开发与诊断综合晋升为 未通过。
+

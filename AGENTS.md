@@ -29,7 +29,7 @@ This file instructs autonomous coding and research agents on how to set up, veri
 | `eval/bluesky_figure4_matrix.py` | Exp 1 Figure 4 benchmark (`geo` vs `sarl-kss` vs `hold-kss`, 15 manifests). |
 | `eval/bluesky_paper_*.py` | Paper evaluation suite: Exp 2 & 3 (`generalization`), Exp 4 (`exp4`), Exp 5 (`exp5`), Exp 6 (`exp6`), and SHA-256 auditor (`audit`). |
 | `configs/b737_legacy_cruise.json` | Measured native BlueSky B737 legacy cruise calibration (`a=2.0 m/s^2`, `bank=25 deg`, `vs=7.62 m/s`). |
-| `tests/test_geometry.py` | 74 unit, geometry, safety-layer, equivariance, and protocol regression tests. |
+| `tests/test_geometry.py` | 80 unit, geometry, safety-layer, equivariance, and protocol regression tests (including delayed single-send transport, zero-communication decentralized MPC, inertia-aware `altitude_admm`, and cross-track zero-init weight migration). |
 
 ### Physical & Protocol Invariants (DO NOT VIOLATE)
 
